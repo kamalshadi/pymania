@@ -291,6 +291,18 @@ class EnsembleST:
     def __len__(self):
         return len(self.data)
 
+    def noise_spectrum(self):
+        pass
+
+    def plot_noise_spectrum(self):
+        pass
+
+    def regressor_spectrum(self):
+        pass
+
+    def plot_regressor_spectrum(self):
+        pass
+
     def find_roi_regressors(self):
         pass
 
