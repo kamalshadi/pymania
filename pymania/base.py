@@ -259,29 +259,36 @@ class EnsembleST:
         tmp = arg[0]
         if isinstance(tmp,ST):
             self._data = arg
-            self._rois = {(xx.roi1,xx.roi2):i for i,xx in enumerate(args)}
+            self._sts = {(xx.roi1,xx.roi2):i for i,xx in enumerate(args)}
+            self._rois = set([item for sublist in self._sts.keys() for item in sublist])
         elif isinstance(tmp,PairST):
             self._data = [tmp.st1]*2*len(arg)
-            self._rois = {}
+            self._sts = {}
+            self._rois = set([])
             for i,pair in enumerate(arg):
                 self._data[2*i] = pair.st1
                 self._data[2*i+1] = pair.st2
-                self._rois[(pair.st1.roi1,pair.st1.roi2)] = 2*i
-                self._rois[(pair.st2.roi1,pair.st2.roi2)] = 2*i + 1
+                self._sts[(pair.st1.roi1,pair.st1.roi2)] = 2*i
+                self._sts[(pair.st2.roi1,pair.st2.roi2)] = 2*i + 1
+                self._rois.add(pair.st1.roi1)
+                self._rois.add(pair.st2.roi1)
+                self._rois.add(pair.st1.roi2)
+                self._rois.add(pair.st2.roi2)
         elif isinstance(tmp,str):
             assert self.mode==0, 'API only works in a single subject mode - Please specify subject ID -> (subject=ID)'
             tmp = io.getdata_sts(self.subject,arg)
-            self._rois = {(xx['n1'],xx['n2']):i for i,xx in enumerate(tmp)}
+            self._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(tmp)}
             self._data = [ST(self.subject,*xx.values()) for xx in tmp]
+            self._rois = arg
         else:
             raise ValueError('Ensemble constructor arguments not known!')
 
     def __call__(self,roi1,roi2,pair=False):
 
-        ind1 = self._rois[(roi1,roi2)]
+        ind1 = self._sts[(roi1,roi2)]
         if not pair:
             return self.data[ind1]
-        ind2 = self._rois[(roi2,roi1)]
+        ind2 = self._sts[(roi2,roi1)]
         return PairST(self.data[ind1],self.data[ind2])
 
 
@@ -292,19 +299,99 @@ class EnsembleST:
         return len(self.data)
 
     def noise_spectrum(self):
-        pass
+        for st in self.data:
+            if st._level<1:
+                st.find_noise_threshold()
+        out = [xx.noise_threshold for xx in self.data]
+        return out
 
-    def plot_noise_spectrum(self):
-        pass
+    def plot_noise_spectrum(self,ax = None):
+        if ax is None:
+            fig, ax = plt.subplots(nrows=1, ncols=1,figsize=(15,10))
+        values = self.noise_spectrum()
+        f,e = np.histogram(a, bins=50)
+        ax.plot(e[1:],f,'b-',lw=2)
+        ax.set_xlabel('Threshold',fontsize=18)
+        ax.set_ylabel('Frequency',fontsize=18)
+        ax.set_title('Noise thresholds',fontsize=18)
+        return ax
+
 
     def regressor_spectrum(self):
-        pass
+        for st in self.data:
+            if st._level<1:
+                st.find_noise_threshold()
+            if st._level<2:
+                st.find_local_regressor()
+        out = [xx.regressor for xx in self.data]
+        return out
 
-    def plot_regressor_spectrum(self):
-        pass
+
+    def plot_regressor_spectrum(self,ax = None):
+        if ax is None:
+            fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(15,10))
+        values = self.regressor_spectrum()
+        f,e = np.histogram([xx.slope for xx in values], bins=50)
+        ax[0].plot(e[1:],f,'b-',lw=2)
+        ax[0].set_xlabel('Slope',fontsize=18)
+        ax[0].set_ylabel('Frequency',fontsize=18)
+        ax[0].set_title('Slope distribution',fontsize=18)
+        f,e = np.histogram([xx.r2 for xx in values], bins=50)
+        ax[1].plot(e[1:],f,'b-',lw=2)
+        ax[1].set_xlabel(r'$r^2$',fontsize=18)
+        ax[1].set_ylabel('Frequency',fontsize=18)
+        ax[1].set_title(r'$r^2$ distribution',fontsize=18)
+        return ax
 
     def find_roi_regressors(self):
-        pass
+        l = len(self.data)
+        D = {}
+        for i in range(l):
+            D[i] = {}
+            D[i]['n1'] = A[i]['n1']
+            D[i]['n2'] = A[i]['n2']
+            if(not A[i]['isSuccess']):
+                D[i]['x'] = []
+                D[i]['y'] = []
+                continue
+            tmp = A[i]['envelope']
+            ce = num.sum([xx[1] for xx in A[i]['envelope']])/len(A[i]['envelope'])
+            cex = num.sum([xx[0] for xx in A[i]['envelope']])/len(A[i]['envelope'])
+            D[i]['x'] = [xx[0]-cex for xx in tmp]
+            D[i]['y'] = [xx[1]-ce for xx in tmp]
+            D[i]['z'] = [xx-ce for xx in A[i]['z']]
+            D[i]['slope'] = A[i]['slope']
+            D[i]['r2'] = A[i]['r2']
+        p = []
+        C = {}
+        N = [hem+str(i+1) for i in range(180)]
+        R = {}
+        for roi in N:
+            # source taget
+            datax = [xx['x'] for xx in D.values() if xx['n1'] == roi]
+            datay = [xx['y'] for xx in D.values() if xx['n1'] == roi]
+            fx = [item for sublist in datax for item in sublist]
+            fy = [item for sublist in datay for item in sublist]
+            F = lslinear(fx,fy)
+            # estimator.fit(num.array(fx).reshape(-1, 1), num.array(fy).reshape(-1, 1))
+            # y0 = estimator.predict(0)[0]
+            # y1 = estimator.predict(1)[0]
+            # z_pred = estimator.predict(alo)
+            R["s-"+roi]=(F['r2'],F['slope'],F['intercept'])
+
+
+            # target
+            datax = [xx['x'] for xx in D.values() if xx['n2'] == roi]
+            datay = [xx['y'] for xx in D.values() if xx['n2'] == roi]
+            fx = [item for sublist in datax for item in sublist]
+            fy = [item for sublist in datay for item in sublist]
+            F = lslinear(fx,fy)
+            # estimator.fit(num.array(fx).reshape(-1, 1), num.array(fy).reshape(-1, 1))
+            # y0 = estimator.predict(0)[0]
+            # y1 = estimator.predict(1)[0]
+            # z_pred = estimator.predict(alo)
+            R["t-"+roi]=(F['r2'],F['slope'],F['intercept'])
+        return R
 
     def plot_roi_regressor(self,roi):
         pass
