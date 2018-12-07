@@ -4,6 +4,7 @@ import pymania.utils as utils
 import pymania.io as io
 import pymania.config as config
 from tqdm import tqdm
+import pickle as pk
 
 
 
@@ -15,6 +16,10 @@ MIN_POINTS_ON_RIGHT = 5
 verbose = False
 
 class ST:
+    '''
+    ST class contains all data points from probtrackx run, namely, length and
+    fraction of streamlines reaching from roi1(source) to roi2(target)
+    '''
     roi_regressors = {} # dictionary if roi_regressors keyed by subjects
     min_r2 = 75
     min_envelope_points = 5
@@ -254,13 +259,25 @@ class ST:
             ax.plot(x,z,'k',lw=2,label='Local regressor')
             try:
                 R = ST.roi_regressors[self.subject][f's-{self.roi1}']
-                c = R.correct([x[-1],z[-1]])
+                if len(x)>0:
+                    c = R.correct([x[-1],z[-1]])
+                else:
+                    t = self.max()
+                    x = [t[0]]
+                    z = [t[1]]
+                    c = R.correct([x[-1],z[-1]])
                 ax.plot([0,x[-1]],[c,z[-1]],'r--',lw=2,label='SF regressor')
             except KeyError:
                 pass
             try:
                 R = ST.roi_regressors[self.subject][f't-{self.roi2}']
-                c = R.correct([x[-1],z[-1]])
+                if len(x)>0:
+                    c = R.correct([x[-1],z[-1]])
+                else:
+                    t = self.max()
+                    x = [t[0]]
+                    z = [t[1]]
+                    c = R.correct([x[-1],z[-1]])
                 ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='SF regressor')
             except KeyError:
                 pass
@@ -275,6 +292,9 @@ class ST:
         return ax
 
 class PairST:
+    '''
+    PairST class contains an ST instance and its reverse, i.e., a->b and b->a STs
+    '''
     def __init__(self,st1,st2):
         self.st1 = st1
         self.st2 = st2
@@ -323,6 +343,11 @@ class PairST:
 
 
 class EnsembleST:
+    '''
+    EnsembleST is mainly designed to contain all STs for a single subject study.
+    In future, we may extend this class to contain a single ST
+    from across a subject cohort.
+    '''
     def __init__(self,arg,**kwargs):
         try:
             self.subject = kwargs['subject']
@@ -430,7 +455,9 @@ class EnsembleST:
         return ax
 
     def preprocess(self):
-        # Find all local regressors
+        '''
+        Local processing for each a->b ST relation in the ensemble
+        '''
         print(f'Preprocessing connections for subject{self.subject}')
         for st in tqdm(self.data,total=len(self)):
             if st.isNull():continue
@@ -481,6 +508,12 @@ class EnsembleST:
                 F = {'slope':0,'intercept':-float('inf'),'r2':0}
             _Rt["t-"+roi] = utils.Regressor(F['slope'],F['intercept'],F['r2'])
         self.roi_regressors = {**_Rs, **_Rt}
+        ST.roi_regressors[self.subject] = self.roi_regressors
+
+    def load_roi_regressors(self,fp):
+        with open(fp,'rb') as f:
+            D = pk.load(f)
+        self.roi_regressors = D
         ST.roi_regressors[self.subject] = self.roi_regressors
 
 
@@ -537,6 +570,7 @@ class EnsembleST:
             ax[1].text(20,0,'No Regressor',fontsize=8)
         ax[1].set_title(f'{roi}:Target-fixed regressor',fontsize=18)
 
+
     def find_corrected_weights(self):
         for conn in self.data:
             if conn.isNull():
@@ -546,7 +580,7 @@ class EnsembleST:
                 envs = conn.data[conn.envelopes,:]
             elif conn.max()[1]>config.noise_threshold:
                 # no envelope point but above noise points
-                envs = conn.data[conn.argmax(),:]
+                envs = conn.data[conn.argmax(),:].reshape(1,-1)
             else:
                 conn.corrected_weights = []
                 continue
@@ -556,6 +590,10 @@ class EnsembleST:
             conn.corrected_weights = tmp
 
     def get_matrix1(self):
+        '''
+        Matrix1 elements are based on the strongest connected seed between two
+        terminal ROIs
+        '''
         try:
             return self.matrix1
         except AttributeError:
@@ -568,12 +606,15 @@ class EnsembleST:
                 if roi1==roi2:continue
                 ind = self._sts[(roi1,roi2)]
                 conn = self.data[ind]
-                mat[i,j] = conn.weight
+                mat[i,j] = np.exp(conn.weight)*config.NOS
         self.matrix1 = mat
         return mat
 
 
     def get_matrix2(self):
+        '''
+        Matrix2 elements are corrected by our distance correction framework
+        '''
         try:
             return self.matrix2
         except AttributeError:
@@ -582,46 +623,55 @@ class EnsembleST:
         mat = np.zeros((l,l))
         rois = sorted(self.rois)
 
-        # check if both are above noise level
-        # fallback to regular way
+        # Different modes of correction applied to pairST
         for i,roi1 in enumerate(rois[:l-1]):
             for j,roi2 in enumerate(rois[i+1:]):
                 ind = self._sts[(roi1,roi2)]
                 ind_reverse = self._sts[(roi2,roi1)]
                 conn = self.data[ind]
                 conn_reverse = self.data[ind_reverse]
+
                 # check if a direction is null -> no correction
                 if conn.isNull() or conn_reverse.isNull():
-                    mat[i,j] = conn.weight
-                    mat[j,i] = conn_reverse.weight
+                    mat[i,j] = np.exp(conn.weight)*config.NOS
+                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
                     continue
+
                 # check if a direction is strongly adjacent -> no correction
                 if (conn.isAdjacent(True) or conn_reverse.isAdjacent(True)):
-                    mat[i,j] = conn.weight
-                    mat[j,i] = conn_reverse.weight
+                    mat[i,j] = np.exp(conn.weight)*config.NOS
+                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
                     continue
-                # check if both have envelope points -> correct
+
+                # check if both have envelope points -> correction applied
                 if (len(conn.envelopes)>0 and len(conn_reverse.envelopes)>0):
-                    mat[i,j] = min(conn.corrected_weight,0)
-                    mat[j,i] = min(conn_reverse.corrected_weight,0)
+                    mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
+                    mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
                     continue
-                # check if both are above noise -> correct
+
+                # check if both are above noise -> correction applied
                 if (conn.max()[1]>config.noise_threshold and conn_reverse.max()[1]>config.noise_threshold):
-                    mat[i,j] = min(conn.corrected_weight,0)
-                    mat[j,i] = min(conn_reverse.corrected_weight,0)
+                    mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
+                    mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
                     continue
-            else:
-                # fallback no correction
-                mat[i,j] = conn.weight
-                mat[j,i] = conn_reverse.weight
+                else:
+                    # fallback no correction
+                    mat[i,j] = np.exp(conn.weight)*config.NOS
+                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
         self.matrix2 = mat
         return mat
 
     def run_mania1(self):
+        '''
+        Running MANIA on matrix1
+        '''
         net,den,nar,t = utils.mania_on_mat(self.matrix1)
         self.mania1_network = net
 
     def run_mania2(self):
+        '''
+        Running MANIA on matrix2
+        '''
         net,den,nar,t = utils.mania_on_mat(self.matrix2)
         self.mania2_network = net
 

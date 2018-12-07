@@ -1,6 +1,6 @@
 import numpy as np
 
-def mania_on_mat(B,nos = 5000,cut = 10, log=True):
+def mania_on_mat(B,nos = 5000,cut = 10, log=False):
 	l = nos-2*cut
 	den = [0.0]*l
 	nar = [0.0]*l
