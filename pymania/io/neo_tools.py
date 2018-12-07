@@ -18,7 +18,7 @@ def getdata_st(sub,roi1,roi2):
     """
     query = f'''match (n:ROI)-[r:NOS]->(m:ROI)
     where n.name="{roi1}" and m.name="{roi2}" and r.SUBJECT={sub}
-    return n.name as n1,m.name as n2,r._length as _length,r._weight as _weight'''
+    return n.name as n1,m.name as n2,r._length as _length,r._weight as _weight,r.border as border'''
     A = graph.run(query).data()
     return A[0]
 
@@ -27,7 +27,7 @@ def getdata_sts(sub,rois):
     roi_list = "['" + "','".join(rois) + "']"
     query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                 WHERE n.name IN {roi_list} AND m.name IN {roi_list} AND r.SUBJECT={sub}
-                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight'''
+                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
     out = graph.run(query).data()
     return out
 
@@ -36,7 +36,7 @@ def getdata_st_subs(st,subs):
     sub_list = "[" + ','.join(map(str, subs)) + "]"
     query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                 WHERE n.name='{st.roi1}' AND m.name='{st.roi2}' AND r.SUBJECT IN {sub_list}
-                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight'''
+                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
     out = graph.run(query).data()
     return out
 
@@ -45,11 +45,11 @@ def getdata_pair_subs(st,subs):
     sub_list = "[" + ','.join(map(str, subs)) + "]"
     query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                 WHERE n.name='{st.roi1}' AND m.name='{st.roi2}' AND r.SUBJECT IN {sub_list}
-                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight'''
+                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
     out = graph.run(query).data()
     query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                 WHERE n.name='{st.roi2}' AND m.name='{st.roi1}' AND r.SUBJECT IN {sub_list}
-                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight'''
+                RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
     out.extend(graph.run(query).data())
     return out
 

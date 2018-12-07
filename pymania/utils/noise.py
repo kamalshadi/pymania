@@ -20,6 +20,9 @@ def sweep_threshold(data):
     for i,t in enumerate(thresholds):
         chunk1 = data[data[:,1]>t]
         chunk2 = data[data[:,1]<=t]
+        if len(chunk1)<MIN_REGRESSION_POINTS or len(chunk2)<MIN_REGRESSION_POINTS:
+            eta[i] = 0
+            continue
         eta[i] = r2_fraction(chunk1,chunk2)
     return (thresholds,eta)
 
@@ -40,5 +43,7 @@ def r2_fraction(chunk1,chunk2):
     if (D2['r2']<eps):
         return 0
     if (D1['r2']>100):
+        return 0
+    if D1['r2']<eps:
         return 0
     return np.log((D1['r2']/D2['r2']))

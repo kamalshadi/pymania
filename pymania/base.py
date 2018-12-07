@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pymania.utils as utils
 import pymania.io as io
+import pymania.config as config
+from tqdm import tqdm
 
 
 
@@ -10,14 +12,14 @@ class MANIA2Error(Exception):
 
 MIN_POINTS_ON_RIGHT = 5
 
+verbose = False
 
 class ST:
-    g_noise_threshold = 5.8
-    g_regressor = None
+    roi_regressors = {} # dictionary if roi_regressors keyed by subjects
     min_r2 = 75
     min_envelope_points = 5
     min_points_on_right = 5
-    def __init__(self,subject,roi1,roi2,_length = None,_weight = None):
+    def __init__(self,subject,roi1,roi2,_length = None,_weight = None, border = 0):
         self.subject = subject
         self.roi1 = roi1
         self.roi2 = roi2
@@ -26,6 +28,10 @@ class ST:
         else:
             tmp = io.getdata_st(subject,roi1,roi2)
             self.data = zip(tmp['_length'],tmp['_weight'])
+        if border>0:
+            self.border = border
+        else:
+            self.border = 0
         self._level = 0 # _level zero means no processing is yet done
 
     def __str__(self):
@@ -41,6 +47,18 @@ class ST:
     def data(self):
         return self._data
 
+    @property
+    def weights(self):
+        if self.isNull():
+            return []
+        return self.data[:,1]
+
+    @property
+    def weight(self):
+        if self.isNull():
+            return np.log(1/config.NOS)
+        return np.max(self.data[:,1])
+
     @data.setter
     def data(self,vec):
         self._data = np.array(sorted([[xx[0],np.log(xx[1]/5000.0)] for xx in vec if xx[1]>1]))
@@ -54,19 +72,23 @@ class ST:
 
     @property
     def envelopes(self):
+        if self.isNull():
+            return []
         if self._level>1:
             return self._envelopes
         raise AttributeError('Please first run find_envelope_points')
 
     @property
     def regressor(self):
+        if self.isNull():
+            return utils.Regressor(0,np.log(1/config.NOS),0)
         if self._level>2:
             return self._regressor
         raise AttributeError('Please first run find_local_regressor')
 
     @regressor.setter
     def regressor(self,dic):
-        self._regressor = utils.Regressor(dic['slope'],dic['intercept'],dic['r2'],dic['popt'])
+        self._regressor = utils.Regressor(dic['slope'],dic['intercept'],dic['r2'])
 
     @property
     def local_corrected_weights(self):
@@ -80,6 +102,27 @@ class ST:
             return self._local_corrected_weight
         raise AttributeError('Please first run find_local_corrected_point')
 
+    @property
+    def corrected_weights(self):
+        if self._level>4:
+            return self._corrected_weights
+        raise MANIA2Error(f'Weights are not yet corrected for {self.roi1} to {self.roi2}')
+
+    @corrected_weights.setter
+    def corrected_weights(self,arg):
+        self._corrected_weights = arg
+        self._level = 5
+
+    @property
+    def corrected_weight(self):
+        if self._level>4:
+            if self.isNull():
+                return np.log(1/config.NOS)
+            if len(self.corrected_weights)>0:
+                return np.median(self.corrected_weights)
+            return np.log(1/config.NOS)
+        raise MANIA2Error(f'Weights are not yet corrected for {self.roi1} to {self.roi2}')
+
     def __len__(self):
         return len(self.data)
 
@@ -89,7 +132,8 @@ class ST:
             eta = utils.find_threshold(self.data)
             self._noise_threshold = eta
         except utils.NoiseError as e:
-            print(e)
+            if verbose:
+                print(e)
             self._noise_threshold = -np.log(1/5000)
         self._level = 1
 
@@ -117,8 +161,12 @@ class ST:
         for i,cur in enumerate(self.data):
             if i >= (l - MIN_POINTS_ON_RIGHT):
                 break
-            if self.data[i][1] < self.noise_threshold:
-                continue
+            if config.noise_threshold<0:
+                if self.data[i][1]<config.noise_threshold:
+                    continue
+            else:
+                if self.data[i][1] < config.noise_threshold:
+                    continue
             right_side = self.data[(i+1):,:]
             tmp = right_side.max(axis=0)[1]
             if self.data[i][1] > tmp:
@@ -130,18 +178,39 @@ class ST:
     def isNull(self):
         return len(self)==0
 
+    def isAdjacent(self,strong=False):
+        if not strong:
+            return self.border>0
+        if self.border<1:
+            return False
+        for i,w in enumerate(self.data):
+            if w[0]>1:return False # Seeds are not adjacent anymore
+            if i==(len(self)-1): return False # Last seed
+            if w[1]> (np.max(self.data[(i+1):,:],axis=0)[1]):
+                #adjacent seed with maximum connection weight
+                return True
+        return False
+
+
     def max(self):
         tmp = np.argmax(self.data,axis=0)[1]
         return self.data[tmp,:]
+
+    def argmax(self):
+        return np.argmax(self.data,axis=0)[1]
 
     def find_local_regressor(self):
         if self.isNull():
             raise MANIA2Error('Connection is null')
         if self._level<2:
             raise MANIA2Error('Please first run find_envelope_points')
-        if len(self.envelopes)<2:
-            self.regressor = {slope:0,intercept:self.max()[1],r2:0,popt:(0,0)}
-        self.regressor = utils.lslinear(self.data[self.envelopes,0],self.data[self.envelopes,1])
+
+        try:
+            self.regressor = utils.lslinear(self.data[self.envelopes,0],self.data[self.envelopes,1])
+        except utils.RegressionError as e:
+            if verbose:
+                print(e)
+            self.regressor = {'slope':0,'intercept':self.max()[1],'r2':0}
         self._level = 3
 
     def find_local_corrected_weight(self):
@@ -174,6 +243,7 @@ class ST:
         ax.set_ylabel(r'$T_{log}$',fontsize=18)
         ax.set_xlabel('Distance (mm)',fontsize=18)
         ax.set_title(f'{self.roi1}->{self.roi2}',fontsize=18)
+        ax.axhline(config.noise_threshold,ls='--',color='black',lw=2,label="Global noise threshold")
         if self._level>0:
             ax.axhline(self.noise_threshold,ls='--',color='r',lw=2,label="Noise threshold")
         if self._level>1:
@@ -182,7 +252,18 @@ class ST:
             x = self.data[self.envelopes,0]
             z = list(map(self.regressor.predict,x))
             ax.plot(x,z,'k',lw=2,label='Local regressor')
-            print(f'Local regressor R2 is {self.regressor.r2}')
+            try:
+                R = ST.roi_regressors[self.subject][f's-{self.roi1}']
+                c = R.correct([x[-1],z[-1]])
+                ax.plot([0,x[-1]],[c,z[-1]],'r--',lw=2,label='SF regressor')
+            except KeyError:
+                pass
+            try:
+                R = ST.roi_regressors[self.subject][f't-{self.roi2}']
+                c = R.correct([x[-1],z[-1]])
+                ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='SF regressor')
+            except KeyError:
+                pass
         if self._level>3:
             l = len(self.local_corrected_weights)
             x = [0.0]*l
@@ -249,6 +330,11 @@ class EnsembleST:
         except KeyError:
             self._mode = 1
         self.data = arg
+        self.roi_regressors = None
+
+    @property
+    def rois(self):
+        return self._rois
 
     @property
     def data(self):
@@ -276,10 +362,10 @@ class EnsembleST:
                 self._rois.add(pair.st2.roi2)
         elif isinstance(tmp,str):
             assert self.mode==0, 'API only works in a single subject mode - Please specify subject ID -> (subject=ID)'
-            tmp = io.getdata_sts(self.subject,arg)
-            self._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(tmp)}
-            self._data = [ST(self.subject,*xx.values()) for xx in tmp]
-            self._rois = arg
+            data = io.getdata_sts(self.subject,arg)
+            self._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(data)}
+            self._data = [ST(self.subject,*xx.values()) for xx in data]
+            self._rois = set(arg)
         else:
             raise ValueError('Ensemble constructor arguments not known!')
 
@@ -343,80 +429,217 @@ class EnsembleST:
         ax[1].set_title(r'$r^2$ distribution',fontsize=18)
         return ax
 
+    def preprocess(self):
+        # Find all local regressors
+        print(f'Preprocessing connections for subject{self.subject}')
+        for st in tqdm(self.data,total=len(self)):
+            if st.isNull():continue
+            st.process()
+
+
     def find_roi_regressors(self):
-        l = len(self.data)
-        D = {}
-        for i in range(l):
-            D[i] = {}
-            D[i]['n1'] = A[i]['n1']
-            D[i]['n2'] = A[i]['n2']
-            if(not A[i]['isSuccess']):
-                D[i]['x'] = []
-                D[i]['y'] = []
-                continue
-            tmp = A[i]['envelope']
-            ce = num.sum([xx[1] for xx in A[i]['envelope']])/len(A[i]['envelope'])
-            cex = num.sum([xx[0] for xx in A[i]['envelope']])/len(A[i]['envelope'])
-            D[i]['x'] = [xx[0]-cex for xx in tmp]
-            D[i]['y'] = [xx[1]-ce for xx in tmp]
-            D[i]['z'] = [xx-ce for xx in A[i]['z']]
-            D[i]['slope'] = A[i]['slope']
-            D[i]['r2'] = A[i]['r2']
-        p = []
-        C = {}
-        N = [hem+str(i+1) for i in range(180)]
-        R = {}
-        for roi in N:
-            # source taget
-            datax = [xx['x'] for xx in D.values() if xx['n1'] == roi]
-            datay = [xx['y'] for xx in D.values() if xx['n1'] == roi]
-            fx = [item for sublist in datax for item in sublist]
-            fy = [item for sublist in datay for item in sublist]
-            F = lslinear(fx,fy)
-            # estimator.fit(num.array(fx).reshape(-1, 1), num.array(fy).reshape(-1, 1))
-            # y0 = estimator.predict(0)[0]
-            # y1 = estimator.predict(1)[0]
-            # z_pred = estimator.predict(alo)
-            R["s-"+roi]=(F['r2'],F['slope'],F['intercept'])
+        print(f'Find roi regressors for subject{self.subject}')
+        _Rs = {}
+        _Rt = {}
+        for roi in tqdm(self.rois,total=len(self.rois)):
+            # source fixed regressor
+            xs = []
+            ys = []
+            for i,xx in enumerate(self.rois):
+                if xx==roi:continue
+                ind = self._sts[(roi,xx)]
+                can = self.data[ind]
+                if (can!=roi and can.regressor.r2>75 and len(can.envelopes)>5):
+                    x = [can.data[xx][0] for xx in can.envelopes]
+                    xm = np.mean(x)
+                    y = [can.data[xx][1] for xx in can.envelopes]
+                    ym = np.mean(y)
+                    xs = xs + [xx-xm for xx in x]
+                    ys = ys + [xx-ym for xx in y]
+            try:
+                F = utils.lslinear(xs,ys)
+            except utils.RegressionError:
+                F = {'slope':0,'intercept':-np.log(1/config.NOS),'r2':0}
+            _Rs["s-"+roi] = utils.Regressor(F['slope'],F['intercept'],F['r2'])
+            # target fixed regressor
+            xs = []
+            ys = []
+            for i,xx in enumerate(self.rois):
+                if xx==roi:continue
+                ind = self._sts[(xx,roi)]
+                can = self.data[ind]
+                if (can!=roi and can.regressor.r2>75 and len(can.envelopes)>5):
+                    x = [can.data[xx][0] for xx in can.envelopes]
+                    xm = np.mean(x)
+                    y = [can.data[xx][1] for xx in can.envelopes]
+                    ym = np.mean(y)
+                    xs = xs + [xx-xm for xx in x]
+                    ys = ys + [xx-ym for xx in y]
+            try:
+                F = utils.lslinear(xs,ys)
+            except utils.RegressionError:
+                F = {'slope':0,'intercept':-float('inf'),'r2':0}
+            _Rt["t-"+roi] = utils.Regressor(F['slope'],F['intercept'],F['r2'])
+        self.roi_regressors = {**_Rs, **_Rt}
+        ST.roi_regressors[self.subject] = self.roi_regressors
 
-
-            # target
-            datax = [xx['x'] for xx in D.values() if xx['n2'] == roi]
-            datay = [xx['y'] for xx in D.values() if xx['n2'] == roi]
-            fx = [item for sublist in datax for item in sublist]
-            fy = [item for sublist in datay for item in sublist]
-            F = lslinear(fx,fy)
-            # estimator.fit(num.array(fx).reshape(-1, 1), num.array(fy).reshape(-1, 1))
-            # y0 = estimator.predict(0)[0]
-            # y1 = estimator.predict(1)[0]
-            # z_pred = estimator.predict(alo)
-            R["t-"+roi]=(F['r2'],F['slope'],F['intercept'])
-        return R
 
     def plot_roi_regressor(self,roi):
-        pass
+        fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(15,10))
+        xs = []
+        ys = []
+        for i,xx in enumerate(self.rois):
+            if xx==roi:continue
+            ind = self._sts[(roi,xx)]
+            can = self.data[ind]
+            if (can!=roi and can.regressor.r2>75 and len(can.envelopes)>5):
+                x = [can.data[xx][0] for xx in can.envelopes]
+                xm = np.mean(x)
+                y = [can.data[xx][1] for xx in can.envelopes]
+                ym = np.mean(y)
+                xs.append([xx-xm for xx in x])
+                ys.append([xx-ym for xx in y])
+        for v,w in zip(xs,ys):
+            c=np.random.rand(3,)
+            ax[0].plot(v,w,'s',ms=6,color=c)
+        R = self.roi_regressors['s-'+roi]
+        x = [item for sublist in xs for item in sublist]
+        if R.r2>0:
+            ax[0].plot(x,[R.predict(xx) for xx in x],'k-',lw=2)
+            ax[0].text(20,0,f'R2={R.r2:.2f}, S={R.slope:.3f}',fontsize=8)
+        else:
+            ax[0].text(20,0,'No Regressor',fontsize=8)
+        ax[0].set_title(f'{roi}:Source-fixed regressor',fontsize=18)
+        ax[0].text(20,0,f'R2={R.r2:.2f}, S={R.slope:.3f}',fontsize=8)
+        # target fixed
+        xs = []
+        ys = []
+        for i,xx in enumerate(self.rois):
+            if xx==roi:continue
+            ind = self._sts[(xx,roi)]
+            can = self.data[ind]
+            if (can!=roi and can.regressor.r2>75 and len(can.envelopes)>5):
+                x = [can.data[xx][0] for xx in can.envelopes]
+                xm = np.mean(x)
+                y = [can.data[xx][1] for xx in can.envelopes]
+                ym = np.mean(y)
+                xs.append([xx-xm for xx in x])
+                ys.append([xx-ym for xx in y])
+        for v,w in zip(xs,ys):
+            c=np.random.rand(3,)
+            ax[1].plot(v,w,'s',ms=6,color=c)
+        R = self.roi_regressors['t-'+roi]
+        x = [item for sublist in xs for item in sublist]
+        if R.r2>0:
+            ax[1].plot(x,[R.predict(xx) for xx in x],'k-',lw=2)
+            ax[1].text(20,0,f'R2={R.r2:.2f}, S={R.slope:.3f}',fontsize=8)
+        else:
+            ax[1].text(20,0,'No Regressor',fontsize=8)
+        ax[1].set_title(f'{roi}:Target-fixed regressor',fontsize=18)
 
     def find_corrected_weights(self):
-        pass
+        for conn in self.data:
+            if conn.isNull():
+                conn.corrected_weights = []
+                continue
+            if len(conn.envelopes)>0:
+                envs = conn.data[conn.envelopes,:]
+            elif conn.max()[1]>config.noise_threshold:
+                # no envelope point but above noise points
+                envs = conn.data[conn.argmax(),:]
+            else:
+                conn.corrected_weights = []
+                continue
+            Rs = self.roi_regressors['s-'+conn.roi1]
+            Rt = self.roi_regressors['t-'+conn.roi2]
+            tmp = list(map(Rs.correct,envs))+list(map(Rt.correct,envs))
+            conn.corrected_weights = tmp
 
     def get_matrix1(self):
-        pass
+        try:
+            return self.matrix1
+        except AttributeError:
+            pass
+        l = len(self.rois)
+        mat = np.zeros((l,l))
+        rois = sorted(self.rois)
+        for i,roi1 in enumerate(rois):
+            for j,roi2 in enumerate(rois):
+                if roi1==roi2:continue
+                ind = self._sts[(roi1,roi2)]
+                conn = self.data[ind]
+                mat[i,j] = conn.weight
+        self.matrix1 = mat
+        return mat
+
 
     def get_matrix2(self):
-        pass
+        try:
+            return self.matrix2
+        except AttributeError:
+            pass
+        l = len(self.rois)
+        mat = np.zeros((l,l))
+        rois = sorted(self.rois)
+
+        # check if both are above noise level
+        # fallback to regular way
+        for i,roi1 in enumerate(rois[:l-1]):
+            for j,roi2 in enumerate(rois[i+1:]):
+                ind = self._sts[(roi1,roi2)]
+                ind_reverse = self._sts[(roi2,roi1)]
+                conn = self.data[ind]
+                conn_reverse = self.data[ind_reverse]
+                # check if a direction is null -> no correction
+                if conn.isNull() or conn_reverse.isNull():
+                    mat[i,j] = conn.weight
+                    mat[j,i] = conn_reverse.weight
+                    continue
+                # check if a direction is strongly adjacent -> no correction
+                if (conn.isAdjacent(True) or conn_reverse.isAdjacent(True)):
+                    mat[i,j] = conn.weight
+                    mat[j,i] = conn_reverse.weight
+                    continue
+                # check if both have envelope points -> correct
+                if (len(conn.envelopes)>0 and len(conn_reverse.envelopes)>0):
+                    mat[i,j] = min(conn.corrected_weight,0)
+                    mat[j,i] = min(conn_reverse.corrected_weight,0)
+                    continue
+                # check if both are above noise -> correct
+                if (conn.max()[1]>config.noise_threshold and conn_reverse.max()[1]>config.noise_threshold):
+                    mat[i,j] = min(conn.corrected_weight,0)
+                    mat[j,i] = min(conn_reverse.corrected_weight,0)
+                    continue
+            else:
+                # fallback no correction
+                mat[i,j] = conn.weight
+                mat[j,i] = conn_reverse.weight
+        self.matrix2 = mat
+        return mat
 
     def run_mania1(self):
-        pass
+        net,den,nar,t = utils.mania_on_mat(self.matrix1)
+        self.mania1_network = net
 
     def run_mania2(self):
-        pass
+        net,den,nar,t = utils.mania_on_mat(self.matrix2)
+        self.mania2_network = net
+
+    def plot_mania(self):
+        _,den1,nar1,t1 = utils.mania_on_mat(self.matrix1)
+        _,den2,nar2,t2 = utils.mania_on_mat(self.matrix2)
+        fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(15,10))
+        ax[0].plot(den1,nar1,'b-',lw=2,label='MANIA1')
+        ax[0].plot(den2,nar2,'r-',lw=2,label='MANIA2')
+        ax[0].set_xlabel('density',fontsize=18)
+        ax[0].set_ylabel('NAR',fontsize=18)
+        ax[1].plot(t1,den1,'b-',lw=2,label='MANIA1')
+        ax[1].plot(t2,den2,'r-',lw=2,label='MANIA2')
+        ax[1].set_xlabel('Threshold',fontsize=18)
+        ax[1].set_ylabel('Density',fontsize=18)
+        plt.legend()
+
+
 
     def describe(self):
         pass
-
-
-
-
-
-
-# Get pair data for a subject

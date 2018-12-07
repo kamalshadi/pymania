@@ -33,7 +33,7 @@ def func(x, a, b):
     return a*x + b
 
 class Regressor:
-    def __init__(self,slope,intercept,r2,popt):
+    def __init__(self,slope,intercept,r2,popt=None):
         self.slope = slope
         self.intercept = intercept
         self.r2 = r2
