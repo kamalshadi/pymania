@@ -181,9 +181,17 @@ class ST:
         return outs
 
     def isNull(self):
+        '''
+        ST with no nozero data point is considered Null
+        '''
         return len(self)==0
 
     def isAdjacent(self,strong=False):
+        '''
+        ST a->b is adjacent if a and b have border with each other.
+        They are strongly adjacent if the border seeds are the strongest
+        connection between them.
+        '''
         if not strong:
             return self.border>0
         if self.border<1:
@@ -198,13 +206,20 @@ class ST:
 
 
     def max(self):
+        '''
+        The seed with maxim weight to from the source to target.
+        '''
         tmp = np.argmax(self.data,axis=0)[1]
         return self.data[tmp,:]
 
     def argmax(self):
+        '''
+        The index of the seed with maxim weight to from the source to target.
+        '''
         return np.argmax(self.data,axis=0)[1]
 
     def find_local_regressor(self):
+
         if self.isNull():
             raise MANIA2Error('Connection is null')
         if self._level<2:
@@ -395,7 +410,9 @@ class EnsembleST:
             raise ValueError('Ensemble constructor arguments not known!')
 
     def __call__(self,roi1,roi2,pair=False):
-
+        '''
+        Get the specific ST or PairST from the ensemble
+        '''
         ind1 = self._sts[(roi1,roi2)]
         if not pair:
             return self.data[ind1]
@@ -692,4 +709,8 @@ class EnsembleST:
 
 
     def describe(self):
+        '''
+        inteded to print important metrics from the ensemble
+        density, NAR, threshold, size
+        '''
         pass
