@@ -5,8 +5,6 @@ import pymania.io as io
 import pymania.config as config
 from tqdm import tqdm
 import pickle as pk
-from multiprocessing import Process
-
 
 
 class MANIA2Error(Exception):
@@ -703,14 +701,49 @@ class EnsembleST:
         net,den,nar,t = utils.mania_on_mat(self.matrix2)
         self.mania2_network = net
 
+    def is_connected(self, roi1, roi2, mania2=True):
+        """Return whether a connection exists between the ROIs in the MANIA network generated
+
+        :param roi1: Source ROI
+        :type roi1: str
+        :param roi2: Destination ROI
+        :type roi2: str
+        :param mania2: If True (default), MANIA2 connection is returned. If not, MANIA1 connection is returned
+        :type mania2: bool
+        :return: Whether a connection exists between ROI 1 and ROI 2 in the MANIA network
+        """
+        rois = sorted(self.rois)
+        ind1, ind2 = rois.index(roi1), rois.index(roi2)
+        if mania2:
+            return bool(self.mania2_network[ind1, ind2])
+        else:
+            return bool(self.mania1_network[ind1, ind2])
+
     def save_to_db(self):
-        # loop through all connections
-        # corrected_weights
-        # corrected_weight
-        # correction_type
-        # isAdjacent (conn.mania2_network==1)
-        # save regressors/envelope
-        pass
+        """Save the connections between all the ROIs to Neo4j database
+
+        :return: None
+        """
+        rois = sorted(self.rois)
+        for roi1 in tqdm(rois, desc='ROIs'):
+            for roi2 in rois:
+                if roi1 == roi2: continue
+                ind = self._sts[(roi1, roi2)]
+                conn = self.data[ind]
+                attributes = {'SUBJECT':self.subject,
+                              'corrected_weight': conn.corrected_weight,
+                              'corrected_weights': conn.corrected_weights,
+                              'correction_type': conn.correction_type,
+                              'noise_threshold': conn.noise_threshold,
+                              'is_adjacent': conn.isAdjacent(True),
+                              'is_connected': self.is_connected(roi1, roi2),
+                              'is_connected_mania1': self.is_connected(roi1, roi2, mania2=False),
+                              'regressor': conn.regressor.to_list(),
+                              'envelope': conn.envelopes,
+                              'weight': conn.weight,
+                              'weights': conn.weights
+                              }
+                io.write_connection(roi1, roi2, 'MANIA2', attributes)
 
     def plot_mania(self):
         _,den1,nar1,t1 = utils.mania_on_mat(self.matrix1)
@@ -726,8 +759,6 @@ class EnsembleST:
         ax[1].set_ylabel('Density',fontsize=18)
         plt.legend()
 
-
-
     def describe(self):
         '''
         inteded to print important metrics from the ensemble
@@ -736,5 +767,30 @@ class EnsembleST:
         pass
 
 #####
-# import Pool for multiprocessing
-# Poo(POOL_)
+from multiprocessing import Pool
+
+
+def compute_subject(subject):
+    print('Processing subject %s' % subject)
+    sub = EnsembleST(['L' + str(i) for i in range(1, 181)], subject=subject)
+    sub.preprocess()
+    sub.noise_spectrum()
+    sub.find_roi_regressors()
+    sub.find_corrected_weights()
+    sub.get_matrix1()
+    sub.get_matrix2()
+    sub.run_mania1()
+    sub.run_mania2()
+    sub.save_to_db()
+    print('Completed subject %s' % subject)
+
+
+subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 180533, 186545,
+            188145, 192237, 206323, 227533, 248238, 360030, 361234, 362034, 368753, 401422,
+            413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
+            569965, 644246, 654552, 680452, 701535, 804646, 814548]
+p = Pool(4)
+for _ in tqdm(p.imap_unordered(compute_subject(), subjects), total=len(subjects)):
+    pass
+p.close()
+p.join()

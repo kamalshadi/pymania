@@ -34,3 +34,10 @@ class Regressor:
 
     def correct(self,p):
         return p[1] - p[0]*self.slope
+
+    def to_list(self):
+        """Convert the object to a list containing slope, Intercept and R2
+
+        :return: A list with three elements: Slope, Intercept and R2
+        """
+        return [self.slope,self.intercept, self.r2]
