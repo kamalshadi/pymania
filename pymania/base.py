@@ -5,6 +5,7 @@ import pymania.io as io
 import pymania.config as config
 from tqdm import tqdm
 import pickle as pk
+from multiprocessing import Process
 
 
 
@@ -652,6 +653,8 @@ class EnsembleST:
                 if conn.isNull() or conn_reverse.isNull():
                     mat[i,j] = np.exp(conn.weight)*config.NOS
                     mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    conn.correction_type = 'null'
+                    conn_reverse.correction_type = 'null'
                     continue
 
                 # check if a direction is strongly adjacent -> no correction
@@ -692,6 +695,13 @@ class EnsembleST:
         net,den,nar,t = utils.mania_on_mat(self.matrix2)
         self.mania2_network = net
 
+    def save_to_db(self):
+        # loop through all connections
+        # corrected_weights
+        # corrected_weight
+        # correction_type
+        # save regressors/envelope
+
     def plot_mania(self):
         _,den1,nar1,t1 = utils.mania_on_mat(self.matrix1)
         _,den2,nar2,t2 = utils.mania_on_mat(self.matrix2)
@@ -714,3 +724,7 @@ class EnsembleST:
         density, NAR, threshold, size
         '''
         pass
+
+#####
+# import Pool for multiprocessing
+# Poo(POOL_)
