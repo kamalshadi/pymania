@@ -700,6 +700,7 @@ class EnsembleST:
         # corrected_weights
         # corrected_weight
         # correction_type
+        # isAdjacent (conn.mania2_network==1)
         # save regressors/envelope
 
     def plot_mania(self):
