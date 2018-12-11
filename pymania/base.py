@@ -386,7 +386,7 @@ class EnsembleST:
         tmp = arg[0]
         if isinstance(tmp,ST):
             self._data = arg
-            self._sts = {(xx.roi1,xx.roi2):i for i,xx in enumerate(args)}
+            self._sts = {(xx.roi1,xx.roi2):i for i,xx in enumerate(arg)}
             self._rois = set([item for sublist in self._sts.keys() for item in sublist])
         elif isinstance(tmp,PairST):
             self._data = [tmp.st1]*2*len(arg)
@@ -438,7 +438,7 @@ class EnsembleST:
         if ax is None:
             fig, ax = plt.subplots(nrows=1, ncols=1,figsize=(15,10))
         values = self.noise_spectrum()
-        f,e = np.histogram(a, bins=50)
+        f,e = np.histogram(values, bins=50)
         ax.plot(e[1:],f,'b-',lw=2)
         ax.set_xlabel('Threshold',fontsize=18)
         ax.set_ylabel('Frequency',fontsize=18)
@@ -661,23 +661,31 @@ class EnsembleST:
                 if (conn.isAdjacent(True) or conn_reverse.isAdjacent(True)):
                     mat[i,j] = np.exp(conn.weight)*config.NOS
                     mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    conn.correction_type = 'strongly adjacent'
+                    conn_reverse.correction_type = 'strongly adjacent'
                     continue
 
                 # check if both have envelope points -> correction applied
                 if (len(conn.envelopes)>0 and len(conn_reverse.envelopes)>0):
                     mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
                     mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
+                    conn.correction_type = 'envelope'
+                    conn_reverse.correction_type = 'envelope'
                     continue
 
                 # check if both are above noise -> correction applied
                 if (conn.max()[1]>config.noise_threshold and conn_reverse.max()[1]>config.noise_threshold):
                     mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
                     mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
+                    conn.correction_type = 'above noise'
+                    conn_reverse.correction_type = 'above noise'
                     continue
                 else:
                     # fallback no correction
                     mat[i,j] = np.exp(conn.weight)*config.NOS
                     mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    conn.correction_type = 'fallback'
+                    conn_reverse.correction_type = 'fallback'
         self.matrix2 = mat
         return mat
 
@@ -702,6 +710,7 @@ class EnsembleST:
         # correction_type
         # isAdjacent (conn.mania2_network==1)
         # save regressors/envelope
+        pass
 
     def plot_mania(self):
         _,den1,nar1,t1 = utils.mania_on_mat(self.matrix1)
