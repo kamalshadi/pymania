@@ -10,33 +10,36 @@ import pickle as pk
 class MANIA2Error(Exception):
     pass
 
+
 MIN_POINTS_ON_RIGHT = 5
 
 verbose = False
 
+
 class ST:
-    '''
+    """
     ST class contains all data points from probtrackx run, namely, length and
     fraction of streamlines reaching from roi1(source) to roi2(target)
-    '''
-    roi_regressors = {} # dictionary if roi_regressors keyed by subjects
+    """
+    roi_regressors = {}  # dictionary if roi_regressors keyed by subjects
     min_r2 = 75
     min_envelope_points = 5
     min_points_on_right = 5
-    def __init__(self,subject,roi1,roi2,_length = None,_weight = None, border = 0):
+
+    def __init__(self, subject, roi1, roi2, _length=None, _weight=None, border=0):
         self.subject = subject
         self.roi1 = roi1
         self.roi2 = roi2
         if _length is not None and _weight is not None:
-            self.data = zip(_length,_weight)
+            self.data = zip(_length, _weight)
         else:
-            tmp = io.getdata_st(subject,roi1,roi2)
-            self.data = zip(tmp['_length'],tmp['_weight'])
-        if border>0:
+            tmp = io.getdata_st(subject, roi1, roi2)
+            self.data = zip(tmp['_length'], tmp['_weight'])
+        if border > 0:
             self.border = border
         else:
             self.border = 0
-        self._level = 0 # _level zero means no processing is yet done
+        self._level = 0  # _level zero means no processing is yet done
 
     def __str__(self):
         if self.isNull():
@@ -46,7 +49,6 @@ class ST:
     def __repr__(self):
         return f'ST({self.subject},{self.roi1},{self.roi2})'
 
-
     @property
     def data(self):
         return self._data
@@ -55,22 +57,21 @@ class ST:
     def weights(self):
         if self.isNull():
             return []
-        return self.data[:,1]
+        return self.data[:, 1]
 
     @property
     def weight(self):
         if self.isNull():
             return np.log(1/config.NOS)
-        return np.max(self.data[:,1])
+        return np.max(self.data[:, 1])
 
     @data.setter
-    def data(self,vec):
-        self._data = np.array(sorted([[xx[0],np.log(xx[1]/5000.0)] for xx in vec if xx[1]>1]))
-
+    def data(self, vec):
+        self._data = np.array(sorted([[xx[0], np.log(xx[1]/5000.0)] for xx in vec if xx[1] > 1]))
 
     @property
     def noise_threshold(self):
-        if self._level>0:
+        if self._level > 0:
             return self._noise_threshold
         raise AttributeError('Please first run find_noise_threshold')
 
@@ -78,15 +79,15 @@ class ST:
     def envelopes(self):
         if self.isNull():
             return []
-        if self._level>1:
+        if self._level > 1:
             return self._envelopes
         raise AttributeError('Please first run find_envelope_points')
 
     @property
     def regressor(self):
         if self.isNull():
-            return utils.Regressor(0,np.log(1/config.NOS),0)
-        if self._level>2:
+            return utils.Regressor(0, np.log(1/config.NOS), 0)
+        if self._level > 2:
             return self._regressor
         raise AttributeError('Please first run find_local_regressor')
 
@@ -475,7 +476,7 @@ class EnsembleST:
         Local processing for each a->b ST relation in the ensemble
         '''
         print(f'Preprocessing connections for subject{self.subject}')
-        for st in tqdm(self.data,total=len(self)):
+        for st in tqdm(self.data,total=len(self),desc='Pre'):
             if st.isNull():continue
             st.process()
 
@@ -760,18 +761,19 @@ class EnsembleST:
         plt.legend()
 
     def describe(self):
-        '''
-        inteded to print important metrics from the ensemble
+        """
+        Intended to print important metrics from the ensemble
         density, NAR, threshold, size
-        '''
+        """
         pass
+
 
 #####
 from multiprocessing import Pool
 
 
 def compute_subject(subject):
-    print('Processing subject %s' % subject)
+    # print('Processing subject %s' % subject)
     sub = EnsembleST(['L' + str(i) for i in range(1, 181)], subject=subject)
     sub.preprocess()
     sub.noise_spectrum()
@@ -782,7 +784,7 @@ def compute_subject(subject):
     sub.run_mania1()
     sub.run_mania2()
     sub.save_to_db()
-    print('Completed subject %s' % subject)
+    # print('Completed subject %s' % subject)
 
 
 subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 180533, 186545,
@@ -790,7 +792,7 @@ subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 1805
             413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
             569965, 644246, 654552, 680452, 701535, 804646, 814548]
 p = Pool(4)
-for _ in tqdm(p.imap_unordered(compute_subject(), subjects), total=len(subjects)):
-    pass
+for subject in tqdm(subjects, desc='Sub'):
+    compute_subject(subject)
 p.close()
 p.join()

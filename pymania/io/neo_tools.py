@@ -1,5 +1,8 @@
 from py2neo import Node, Relationship, Graph
+import numpy
+
 graph = Graph(host="canopus.cc.gatech.edu",password='1234')
+
 
 #################### reading from neo4j database #######################
 
@@ -75,6 +78,8 @@ def write_connection(roi1, roi2, relation_type, attributes, run=True):
     for key in attributes:
         if type(attributes[key]) == str:
             attribs += str(key) + ":'" + str(attributes[key]) + "', "
+        elif type(attributes[key]) in [list, numpy.ndarray]:
+            attribs += str(key) + ":[" + ','.join([str(x) for x in attributes[key]]) + "], "
         else:
             attribs += str(key) + ':' + str(attributes[key]) + ', '
     query = match + attribs[:-2] + '}]->(m)'
@@ -108,6 +113,8 @@ def update_connection(roi1, roi2, relation_type, subject, attributes, run=True):
     for key in attributes:
         if type(attributes[key]) == str:
             attribs += 'r.' + str(key) + "='" + str(attributes[key]) + "', "
+        elif type(attributes[key]) == list:
+            attribs += 'r.' + str(key) + "=[" + ','.join([str(x) for x in attributes[key]]) + "], "
         else:
             attribs += 'r.' + str(key) + '=' + str(attributes[key]) + ', '
     query = match + attribs[:-2]
