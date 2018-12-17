@@ -650,39 +650,39 @@ class EnsembleST:
 
                 # check if a direction is null -> no correction
                 if conn.isNull() or conn_reverse.isNull():
-                    mat[i,j] = np.exp(conn.weight)*config.NOS
-                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    mat[i,j+i+1] = np.exp(conn.weight)*config.NOS
+                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*config.NOS
                     conn.correction_type = 'null'
                     conn_reverse.correction_type = 'null'
                     continue
 
                 # check if a direction is strongly adjacent -> no correction
                 if (conn.isAdjacent(True) or conn_reverse.isAdjacent(True)):
-                    mat[i,j] = np.exp(conn.weight)*config.NOS
-                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    mat[i,j+i+1] = np.exp(conn.weight)*config.NOS
+                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*config.NOS
                     conn.correction_type = 'strongly adjacent'
                     conn_reverse.correction_type = 'strongly adjacent'
                     continue
 
                 # check if both have envelope points -> correction applied
                 if (len(conn.envelopes)>0 and len(conn_reverse.envelopes)>0):
-                    mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
-                    mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
+                    mat[i,j+i+1] = np.exp(min(conn.corrected_weight,0))*config.NOS
+                    mat[j+i+1,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
                     conn.correction_type = 'envelope'
                     conn_reverse.correction_type = 'envelope'
                     continue
 
                 # check if both are above noise -> correction applied
                 if (conn.max()[1]>config.noise_threshold and conn_reverse.max()[1]>config.noise_threshold):
-                    mat[i,j] = np.exp(min(conn.corrected_weight,0))*config.NOS
-                    mat[j,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
+                    mat[i,j+i+1] = np.exp(min(conn.corrected_weight,0))*config.NOS
+                    mat[j+i+1,i] = np.exp(min(conn_reverse.corrected_weight,0))*config.NOS
                     conn.correction_type = 'above noise'
                     conn_reverse.correction_type = 'above noise'
                     continue
                 else:
                     # fallback no correction
-                    mat[i,j] = np.exp(conn.weight)*config.NOS
-                    mat[j,i] = np.exp(conn_reverse.weight)*config.NOS
+                    mat[i,j+i+1] = np.exp(conn.weight)*config.NOS
+                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*config.NOS
                     conn.correction_type = 'fallback'
                     conn_reverse.correction_type = 'fallback'
         self.matrix2 = mat
@@ -783,16 +783,18 @@ def compute_subject(subject):
     sub.get_matrix2()
     sub.run_mania1()
     sub.run_mania2()
-    sub.save_to_db()
+    # sub.save_to_db()
     # print('Completed subject %s' % subject)
+    return sub
 
 
-subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 180533, 186545,
-            188145, 192237, 206323, 227533, 248238, 360030, 361234, 362034, 368753, 401422,
-            413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
-            569965, 644246, 654552, 680452, 701535, 804646, 814548]
-p = Pool(4)
-for subject in tqdm(subjects, desc='Sub'):
-    compute_subject(subject)
-p.close()
-p.join()
+if __name__ == '__main__':
+    subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 180533, 186545,
+                188145, 192237, 206323, 227533, 248238, 360030, 361234, 362034, 368753, 401422,
+                413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
+                569965, 644246, 654552, 680452, 701535, 804646, 814548]
+    p = Pool(4)
+    for subject in tqdm(subjects, desc='Sub'):
+        compute_subject(subject)
+    p.close()
+    p.join()

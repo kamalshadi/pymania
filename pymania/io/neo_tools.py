@@ -61,17 +61,15 @@ def getdata_pair_subs(st,subs):
 def write_connection(roi1, roi2, relation_type, attributes, run=True):
     """Write a connection to Neo4j database
 
-    :param roi1: Source ROI
-    :type roi1: str
-    :param roi2: Destination ROI
-    :type roi2: str
-    :param relation_type: Type of relationship to write
-    :type relation_type: str
-    :param attributes: Dictionary of attributes of the link
-    :type attributes: dict
-    :param run: Whether to run the query or return the query
-    :type run: bool
-    :return: The query generated if run is False
+    Args:
+        roi1 (str): Source ROI
+        roi2 (str): Destination ROI
+        relation_type (str): Type of relationship to update
+        attributes (dict): Dictionary of attributes to update
+        run (bool): Whether to run the query or return the query
+
+    Returns:
+        str: Query generated if run is False
     """
     match = f"MATCH (n:ROI{{name:'{roi1}'}}), (m:ROI{{name:'{roi2}'}}) "
     attribs = f"CREATE (n)-[:{relation_type} {{"
@@ -92,19 +90,16 @@ def write_connection(roi1, roi2, relation_type, attributes, run=True):
 def update_connection(roi1, roi2, relation_type, subject, attributes, run=True):
     """Update a connection in Neo4j database
 
-    :param roi1: Source ROI
-    :type roi1: str
-    :param roi2: Destination ROI
-    :type roi2: str
-    :param relation_type: Type of relationship to update
-    :type relation_type str
-    :param subject: Subject ID
-    :type subject: int or str
-    :param attributes: Dictionary of attributes to update
-    :type attributes: dict
-    :param run: Whether to run the query or return the query
-    :type run: dict
-    :return: Query generated if run is False
+    Args:
+        roi1 (str): Source ROI
+        roi2 (str): Destination ROI
+        relation_type (str): Type of relationship to update
+        subject (int or str): Subject ID
+        attributes (dict): Dictionary of attributes to update
+        run (bool): Whether to run the query or return the query
+
+    Returns:
+        str: Query generated if run is False
     """
     if type(subject) != str:
         subject = str(subject)
