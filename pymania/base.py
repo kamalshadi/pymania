@@ -765,7 +765,19 @@ class EnsembleST:
         Intended to print important metrics from the ensemble
         density, NAR, threshold, size
         """
-        pass
+        s[0] = f'Subject:{self.subject}'
+        s[1] = f'Number of ROIs:{len(self.rois)}'
+        s[2] = f'Number of STs:{len(self._sts)}'
+        s[3] = '--------------------'
+        s[4] = f'MANIA1 Results'
+        s[5] = f'Density:{utils.density(self.mania1_network)}'
+        s[6] = f'NAR:{utils.NAR(self.mania1_network)}'
+        s[7] = '--------------------'
+        s[8] = f'MANIA2 Results'
+        s[9] = f'Density:{utils.density(self.mania2_network)}'
+        s[10] = f'NAR:{utils.NAR(self.mania2_network)}'
+        return '\n'.join(s)
+
 
 
 #####
@@ -788,13 +800,11 @@ def compute_subject(subject):
     return sub
 
 
-if __name__ == '__main__':
+def compute_subjects():
+    print('p')
     subjects = [126426, 135124, 137431, 144125, 146735, 152427, 153227, 177140, 180533, 186545,
                 188145, 192237, 206323, 227533, 248238, 360030, 361234, 362034, 368753, 401422,
                 413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
                 569965, 644246, 654552, 680452, 701535, 804646, 814548]
-    p = Pool(4)
     for subject in tqdm(subjects, desc='Sub'):
         compute_subject(subject)
-    p.close()
-    p.join()

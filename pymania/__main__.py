@@ -1,0 +1,1 @@
+pymania.compute_subjects()
