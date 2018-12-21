@@ -1,4 +1,5 @@
 from py2neo import Node, Relationship, Graph
+import json
 import numpy
 
 graph = Graph(host="canopus.cc.gatech.edu",password='1234')
@@ -117,3 +118,31 @@ def update_connection(roi1, roi2, relation_type, subject, attributes, run=True):
         graph.run(query)
     else:
         return query
+
+
+def update_roi_regressor(subject, run=True):
+    """Add or update the ROI Regressor for the subject in Neo4j database
+
+    Args:
+        subject (pymania.base.EnsembleST): Subject for which the ROI Regressor has to be added or updated
+        run (bool): Whether to run the query or return the list of queries
+
+    Returns:
+        list: List of queries to be run
+    """
+    queries = []
+    for roi in subject.rois:
+        roi_regressor = graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
+        if roi_regressor is None:
+            roi_regressor = '{}'
+        roi_regressor_dict = json.loads(roi_regressor)
+        roi_regressor_dict[str(subject.subject)] = {'s': subject.roi_regressors['s-'+roi].to_list(),
+                                                    't': subject.roi_regressors['s-'+roi].to_list()}
+        roi_regressor_json = json.dumps(roi_regressor_dict)
+        query = f"MATCH (n:ROI{{name:'{roi}'}}) SET n.roi_regressor='{roi_regressor_json}'"
+        if run:
+            graph.run(query)
+        else:
+            queries.append(query)
+    if not run:
+        return queries

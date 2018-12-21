@@ -793,7 +793,8 @@ def compute_subject(subject):
     sub.get_matrix2()
     sub.run_mania1()
     sub.run_mania2()
-    # sub.save_to_db()
+    sub.save_to_db()
+    update_roi_regressor(sub)
     # print('Completed subject %s' % subject)
     return sub
 
