@@ -133,7 +133,7 @@ def update_roi_regressor(subject, run=True):
     queries = []
     for roi in subject.rois:
         roi_regressor = graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
-        if roi_regressor is None:
+        if roi_regressor is None or roi_regressor == '':
             roi_regressor = '{}'
         roi_regressor_dict = json.loads(roi_regressor)
         roi_regressor_dict[str(subject.subject)] = {'s': subject.roi_regressors['s-'+roi].to_list(),
