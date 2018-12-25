@@ -782,7 +782,7 @@ class EnsembleST:
 from multiprocessing import Pool
 
 
-def compute_subject(subject):
+def compute_subject(subject, save=False):
     # print('Processing subject %s' % subject)
     sub = EnsembleST(['L' + str(i) for i in range(1, 181)], subject=subject)
     sub.preprocess()
@@ -793,8 +793,9 @@ def compute_subject(subject):
     sub.get_matrix2()
     sub.run_mania1()
     sub.run_mania2()
-    sub.save_to_db()
-    update_roi_regressor(sub)
+    if save:
+        sub.save_to_db()
+        update_roi_regressor(sub)
     # print('Completed subject %s' % subject)
     return sub
 
@@ -805,6 +806,9 @@ def compute_subjects():
                 188145, 192237, 206323, 227533, 248238, 360030, 361234, 362034, 368753, 401422,
                 413934, 453542, 463040, 468050, 481042, 825654, 911849, 917558, 992673, 558960,
                 569965, 644246, 654552, 680452, 701535, 804646, 814548]
-    subjects = [126426]
+    subjects = [126426, 137431, 144125, 146735, 152427, 135124, 192237, 206323, 227533, 248238,
+                360030, 361234, 362034, 368753, 401422, 413934, 453542, 463040, 468050, 481042]
+    subjects_h = [153227, 177140, 180533, 186545, 188145, 569965, 644246, 654552, 680452, 701535,
+                804646, 814548, 825654, 911849, 917558, 992673, 558960]
     for subject in tqdm(subjects, desc='Sub'):
-        compute_subject(subject)
+        compute_subject(subject, True)

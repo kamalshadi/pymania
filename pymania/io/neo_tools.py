@@ -58,6 +58,27 @@ def getdata_pair_subs(st,subs):
     return out
 
 
+def get_roi_regressor(roi, subject=None):
+    """Get the ROI regressor for a ROI and a subject (optional)
+
+    Args:
+        roi (str): ROI to which the ROI
+        subject (int or str): Subject ID for which ROI regressor is needed. If None (default), ROI regressor
+                            for all subjects is retured.
+
+    Returns:
+        dict: ROI regressor for the subject. If subject is None, ROI regressor for all subjects
+    """
+    roi_regressor = graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
+    if roi_regressor is None or roi_regressor == '':
+        roi_regressor = '{}'
+    roi_regressor_dict = json.loads(roi_regressor)
+    if subject is None:
+        return roi_regressor_dict
+    else:
+        return roi_regressor_dict[str(subject)]
+
+
 #################### writing to neo4j database #######################
 def write_connection(roi1, roi2, relation_type, attributes, run=True):
     """Write a connection to Neo4j database
