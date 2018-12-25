@@ -25,6 +25,21 @@ class ST:
     min_envelope_points = 5
     min_points_on_right = 5
 
+    @staticmethod
+    def load_roi_regressors():
+        D = {}
+        for roi in ['L'+str(i) for i in range(1,181)]:
+            tmp = get_roi_regressor(roi)
+            for sub in tmp.keys():
+                try:
+                    D[int(sub)]['s-'+roi] = Regressor(*tmp[sub]['s'])
+                    D[int(sub)]['t-'+roi] = Regressor(*tmp[sub]['t'])
+                except KeyError:
+                    D[int(sub)] = {}
+                    D[int(sub)]['s-'+roi] = Regressor(*tmp[sub]['s'])
+                    D[int(sub)]['t-'+roi] = Regressor(*tmp[sub]['t'])
+        ST.roi_regressors = D
+
     def __init__(self, subject, roi1, roi2, _length=None, _weight=None, border=0):
         self.subject = subject
         self.roi1 = roi1
@@ -34,11 +49,25 @@ class ST:
         else:
             tmp = getdata_st(subject, roi1, roi2)
             self.data = zip(tmp['_length'], tmp['_weight'])
+            get_roi_regressor('L1',subject)
         if border > 0:
             self.border = border
         else:
             self.border = 0
         self._level = 0  # _level zero means no processing is yet done
+
+    def isConnected(self, mania2=True):
+        if mania2:
+            return self._is_connected
+        return self._is_connected_mania1
+
+
+    def load_mania_results(self):
+        tmp =getmania_st(self.subject,self.roi1,self.roi2)
+        self.correction_type = tmp['correction_type']
+        self._is_connected = tmp['is_connected']
+        self._is_connected_mania1 = tmp['is_connected_mania1']
+
 
     def __str__(self):
         if self.isNull():
@@ -252,16 +281,19 @@ class ST:
 
 
     def plot(self,ax = None):
-        if self.isNull():
-            print(f'Connection {self.roi1} to {self.roi2} is null')
-            return
         if ax is None:
             fig, ax = plt.subplots(nrows=1, ncols=1,figsize=(15,10))
-        ax.plot(self.data[:,0],self.data[:,1],'b*')
+
         ax.set_xlabel('Distance (mm)',fontsize=18)
         ax.set_ylabel(r'$T_{log}$',fontsize=18)
         ax.set_xlabel('Distance (mm)',fontsize=18)
-        ax.set_title(f'{self.roi1}->{self.roi2}',fontsize=18)
+        ax.set_title(f'{self.roi1}->{self.roi2}-({self.correction_type})',fontsize=18)
+        if self.isNull():
+            ax.set_facecolor('#000000')
+            ax.text(0.05,.9,f'SUB:{self.subject}',color="white")
+            return
+        ax.text(0.05,-1,f'SUB:{self.subject}',color="black")
+        ax.plot(self.data[:,0],self.data[:,1],'b*')
         ax.axhline(noise_threshold,ls='--',color='black',lw=2,label="Global noise threshold")
         if self._level>0:
             ax.axhline(self.noise_threshold,ls='--',color='r',lw=2,label="Noise threshold")
@@ -292,9 +324,14 @@ class ST:
                     x = [t[0]]
                     z = [t[1]]
                     c = R.correct([x[-1],z[-1]])
-                ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='SF regressor')
+                ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='TF regressor')
             except KeyError:
                 pass
+
+        if self.isConnected():
+            ax.set_facecolor((0/255,255/255,0/255,.2))
+        else:
+            ax.set_facecolor((80/255,80/255,80/255,.2))
         if self._level>3:
             l = len(self.local_corrected_weights)
             x = [0.0]*l
@@ -336,7 +373,7 @@ class PairST:
             raise ValueError('Argument to PairST constructor is not an ST instance')
 
     def plot(self,ax = None):
-        if ax:
+        if ax is not None:
             assert len(ax)==2, "You must provide two axis for pairST plot"
         else:
             fig, ax = plt.subplots(nrows=1, ncols=2,figsize=(15,10))
@@ -344,7 +381,7 @@ class PairST:
         self.st2.plot(ax[1])
 
     def noise_plot(self, ax = None):
-        if ax:
+        if ax is not None:
             m,n = ax.shape
             assert (m==2 and n==2), "You must provide 2x2 axis for pairST noise plot"
         else:
@@ -692,6 +729,8 @@ class EnsembleST:
         Running MANIA on matrix1
         '''
         net,den,nar,t = mania_on_mat(self.matrix1)
+        ind = np.argmin(nar)
+        self.threshold1 = t[ind]
         self.mania1_network = net
 
     def run_mania2(self):
@@ -699,6 +738,8 @@ class EnsembleST:
         Running MANIA on matrix2
         '''
         net,den,nar,t = mania_on_mat(self.matrix2)
+        ind = np.argmin(nar)
+        self.threshold2 = t[ind]
         self.mania2_network = net
 
     def is_connected(self, roi1, roi2, mania2=True):
@@ -735,6 +776,8 @@ class EnsembleST:
                               'corrected_weights': conn.corrected_weights,
                               'correction_type': conn.correction_type,
                               'noise_threshold': conn.noise_threshold,
+                              'threshold1':self.threshold1,
+                              'threshold2':self.threshold2,
                               'is_adjacent': conn.isAdjacent(True),
                               'is_connected': self.is_connected(roi1, roi2),
                               'is_connected_mania1': self.is_connected(roi1, roi2, mania2=False),
@@ -771,10 +814,13 @@ class EnsembleST:
              f'MANIA1 Results',
              f'Density:{density(self.mania1_network)}',
              f'NAR:{NAR(self.mania1_network)}',
+             f'threshold:{self.threshold1}'
              '--------------------',
              f'MANIA2 Results',
              f'Density:{density(self.mania2_network)}',
-             f'NAR:{NAR(self.mania2_network)}']
+             f'NAR:{NAR(self.mania2_network)}',
+             f'threshold:{self.threshold2}'
+             ]
         return '\n'.join(s)
 
 

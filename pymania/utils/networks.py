@@ -18,9 +18,10 @@ def mania_on_mat(B,nos = 5000,cut = 10, log=False):
 		den[i-cut-1] = density(C)
 		tmp = NAR(C)
 		nar[i-cut-1] = tmp
-		if tmp<his:
-			his = tmp
-			net = C
+	ind = np.argmin(nar)
+	t = t[ind]
+	net = np.zeros((n,n))
+	net[B>=t] = 1
 	return (net,den,nar,t)
 
 

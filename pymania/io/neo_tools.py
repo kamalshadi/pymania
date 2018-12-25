@@ -26,6 +26,22 @@ def getdata_st(sub,roi1,roi2):
     A = graph.run(query).data()
     return A[0]
 
+def getmania_st(sub,roi1,roi2):
+    """
+    Args:
+        sub (int): Subject ID.
+        roi1 (str): First ROI name.
+        roi2 (str):Second ROI name.
+
+    Returns:
+        Object: MANIA2 results.
+    """
+    query = f'''match (n:ROI)-[r:MANIA2]->(m:ROI)
+    where n.name="{roi1}" and m.name="{roi2}" and r.SUBJECT={sub}
+    return r.correction_type as correction_type,r.is_connected as is_connected,r.is_connected_mania1 as is_connected_mania1'''
+    A = graph.run(query).data()
+    return A[0]
+
 
 def getdata_sts(sub,rois):
     roi_list = "['" + "','".join(rois) + "']"

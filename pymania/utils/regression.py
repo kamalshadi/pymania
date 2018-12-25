@@ -29,6 +29,12 @@ class Regressor:
         self.r2 = r2
         self.popt = popt
 
+    def __str__(self):
+        return f'Regressor({self.slope:.3f},{self.intercept:.3f},{self.r2:.0f})'
+
+    def __repr__(self):
+        return f'Regressor({self.slope},{self.intercept},{self.r2})'
+
     def predict(self,x):
         return self.intercept + x*self.slope
 
