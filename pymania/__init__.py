@@ -1,3 +1,3 @@
-from pymania.base import *
-import pymania.io as io
-import pymania.utils as utils
+from .base import *
+# import .io as io
+# import pymania.utils as utils
