@@ -19,9 +19,9 @@ def mania_on_mat(B,nos = 5000,cut = 10, log=False):
 		tmp = NAR(C)
 		nar[i-cut-1] = tmp
 	ind = np.argmin(nar)
-	t = t[ind]
+	th = t[ind]
 	net = np.zeros((n,n))
-	net[B>=t] = 1
+	net[B>=th] = 1
 	return (net,den,nar,t)
 
 
