@@ -38,7 +38,9 @@ def getmania_st(sub,roi1,roi2):
     """
     query = f'''match (n:ROI)-[r:MANIA2]->(m:ROI)
     where n.name="{roi1}" and m.name="{roi2}" and r.SUBJECT={sub}
-    return r.correction_type as correction_type,r.is_connected as is_connected,r.is_connected_mania1 as is_connected_mania1'''
+    return r.correction_type as correction_type,r.is_connected as is_connected,
+    r.is_connected_mania1 as is_connected_mania1, r.threshold1 as threshold1, r.threshold2 as threshold2,
+    r.corrected_weights as corrected_weights'''
     A = graph.run(query).data()
     return A[0]
 
