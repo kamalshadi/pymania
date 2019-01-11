@@ -136,6 +136,8 @@ class Solver(ABC):
             ind = np.argmin(nar)
             subject.threshold2 = t[ind]
             subject.mania2_network = net
+            self.save_to_db(subject)
+
 
     @is_loaded
     @pipeline(-1)
@@ -148,33 +150,32 @@ class Solver(ABC):
 
     @is_loaded
     @pipeline(-1)
-    def save_to_db(self):
+    def save_to_db(self,subject):
         """Save the connections between all the ROIs to Neo4j database
         :return: None
         """
         rois = sorted(self.rois)
-        for subject in self:
-            for roi1 in tqdm(rois, desc='ROIs'):
-                for roi2 in rois:
-                    if roi1 == roi2: continue
-                    ind = subject._sts[(roi1, roi2)]
-                    conn = subject.data[ind]
-                    attributes = {'SUBJECT':subject.subject,
-                                  'corrected_weight': conn.corrected_weight,
-                                  'corrected_weights': conn.corrected_weights,
-                                  'correction_type': conn.correction_type,
-                                  'noise_threshold': conn.noise_threshold,
-                                  'threshold1':subject.threshold1,
-                                  'threshold2':subject.threshold2,
-                                  'is_adjacent': conn.isAdjacent(True),
-                                  'is_connected': subject.is_connected(roi1, roi2),
-                                  'is_connected_mania1': subject.is_connected(roi1, roi2, mania2=False),
-                                  'regressor': conn.regressor.to_list(),
-                                  'envelope': conn.envelopes,
-                                  'weight': conn.weight,
-                                  'weights': conn.weights
-                                  }
+        for roi1 in tqdm(rois, desc='ROIs'):
+            for roi2 in rois:
+                if roi1 == roi2: continue
+                ind = subject._sts[(roi1, roi2)]
+                conn = subject.data[ind]
+                attributes = {'SUBJECT':subject.subject,
+                              'corrected_weight': conn.corrected_weight,
+                              'corrected_weights': conn.corrected_weights,
+                              'correction_type': conn.correction_type,
+                              'noise_threshold': conn.noise_threshold,
+                              'threshold1':subject.threshold1,
+                              'threshold2':subject.threshold2,
+                              'is_adjacent': conn.isAdjacent(True),
+                              'is_connected': subject.is_connected(roi1, roi2),
+                              'is_connected_mania1': subject.is_connected(roi1, roi2, mania2=False),
+                              'regressor': conn.regressor.to_list(),
+                              'envelope': conn.envelopes,
+                              'weight': conn.weight,
+                              'weights': conn.weights
+                              }
 
-                    attributes['run_id'] = self.name + '_' + self.id
-                    attributes['run_id'] = 'test'
-                    self.backend.write_connection(roi1, roi2, 'MANIA2', attributes)
+                attributes['run_id'] = self.name + '_' + self.id
+                attributes['run_id'] = 'test'
+                self.backend.write_connection(roi1, roi2, 'MANIA2', attributes)

@@ -132,9 +132,7 @@ def find_corrected_weights(st):
             tmp = list(map(st.regressor.correct,envs))
         else:
             st.correction_type = 'Bad regressor'
-            envs = st.data[st.envelopes,:]
             tmp = [st.max()[1]]
-
     else:
         st.correction_type = 'No Envelope'
         tmp = [st.max()[1]]
