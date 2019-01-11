@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from ..config import *
 
 class RegressionError(Exception):
     pass
@@ -35,6 +36,9 @@ class Regressor:
     def __repr__(self):
         return f'Regressor({self.slope},{self.intercept},{self.r2})'
 
+    def isNull(self):
+        return self.r2==0
+
     def predict(self,x):
         return self.intercept + x*self.slope
 
@@ -47,3 +51,7 @@ class Regressor:
         :return: A list with three elements: Slope, Intercept and R2
         """
         return [self.slope,self.intercept, self.r2]
+
+def create_null_regressor():
+    tmp = np.log(1/config.NOS)
+    return Regressor(0,tmp,0)

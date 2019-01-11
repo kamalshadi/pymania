@@ -49,11 +49,7 @@ class ST:
         else:
             tmp = getdata_st(subject, roi1, roi2)
             self.data = zip(tmp['_length'], tmp['_weight'])
-            get_roi_regressor('L1',subject)
-        if border > 0:
-            self.border = border
-        else:
-            self.border = 0
+        self.border = border
         self._level = 0  # _level zero means no processing is yet done
         self._mania_loaded = False
 
@@ -76,6 +72,16 @@ class ST:
 
     def __repr__(self):
         return f'ST({self.subject},{self.roi1},{self.roi2})'
+
+    def __iter__(self):
+        for data in self.data:
+            yield data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, i):
+        return self.data[i]
 
     @property
     def data(self):
@@ -113,75 +119,53 @@ class ST:
     @property
     def weight(self):
         if self.isNull():
-            return np.log(1/NOS)
+            return np.log(1/config.NOS)
         return np.max(self.data[:, 1])
 
     @property
     def noise_threshold(self):
-        if self._level > 0:
-            return self._noise_threshold
-        raise AttributeError('Please first run find_noise_threshold')
+        return self._noise_threshold
 
     @property
     def envelopes(self):
         if self.isNull():
             return []
-        if self._level > 1:
+        try:
             return self._envelopes
-        raise AttributeError('Please first run find_envelope_points')
+        except AttributeError:
+            raise AttributeError('Please first run find_envelope_points of the solver')
 
     @property
     def regressor(self):
-        if self.isNull():
-            return Regressor(0, np.log(1/NOS), 0)
-        if self._level > 2:
+        try:
             return self._regressor
-        raise AttributeError('Please first run find_local_regressor')
+        except AttributeError:
+            raise AttributeError('Please first run find_local_regressors of the solver')
 
     @regressor.setter
     def regressor(self,dic):
         self._regressor = Regressor(dic['slope'],dic['intercept'],dic['r2'])
 
     @property
-    def local_corrected_weights(self):
-        if self._level>3:
-            return self._local_corrected_weights
-        raise AttributeError('Please first run find_local_corrected_point')
-
-    @property
-    def local_corrected_weight(self):
-        if self._level>3:
-            return self._local_corrected_weight
-        raise AttributeError('Please first run find_local_corrected_point')
-
-    @property
     def corrected_weights(self):
-        if self._level>4:
+        try:
             return self._corrected_weights
-        raise MANIA2Error(f'Weights are not yet corrected for {self.roi1} to {self.roi2}')
+        except AttributeError:
+            raise MANIA2Error(f'Weights are not yet corrected for {self.roi1} to {self.roi2}')
 
     @corrected_weights.setter
     def corrected_weights(self,arg):
         self._corrected_weights = arg
-        self._level = 5
 
     @property
     def corrected_weight(self):
-        if self._level>4:
-            if self.isNull():
-                return np.log(1/NOS)
-            if len(self.corrected_weights)>0:
-                return np.median(self.corrected_weights)
-            return np.log(1/NOS)
-        raise MANIA2Error(f'Weights are not yet corrected for {self.roi1} to {self.roi2}')
+        try:
+            return self._corrected_weight
+        except AttributeError:
+            raise MANIA2Error("Corrected weight not found")
 
     def isConnected(self,mania2=True):
-        if self._mania_loaded:
-            return self._is_connected if mania2 else self._is_connected_mania1
-        raise MANIA2ERROR('Please run load_mania_results first')
-
-    def __len__(self):
-        return len(self.data)
+        return self._is_connected if mania2 else self._is_connected_mania1
 
 
     def find_noise_threshold(self):
@@ -210,27 +194,6 @@ class ST:
 
         ax[1].set_xlim([-7.8,0])
 
-
-
-    def find_envelope_points(self):
-        outs = []
-        l = len(self)
-        for i,cur in enumerate(self.data):
-            if i >= (l - MIN_POINTS_ON_RIGHT):
-                break
-            if noise_threshold<0:
-                if self.data[i][1]<noise_threshold:
-                    continue
-            else:
-                if self.data[i][1] < noise_threshold:
-                    continue
-            right_side = self.data[(i+1):,:]
-            tmp = right_side.max(axis=0)[1]
-            if self.data[i][1] > tmp:
-                outs.append(i)
-        self._envelopes = outs
-        self._level = 2
-        return outs
 
     def isNull(self):
         '''
@@ -266,33 +229,9 @@ class ST:
 
     def argmax(self):
         '''
-        The index of the seed with maxim weight to from the source to target.
+        The index of the seed with maximum weight from the source to the target.
         '''
         return np.argmax(self.data,axis=0)[1]
-
-    def find_local_regressor(self):
-
-        if self.isNull():
-            raise MANIA2Error('Connection is null')
-        if self._level<2:
-            raise MANIA2Error('Please first run find_envelope_points')
-
-        try:
-            self.regressor = lslinear(self.data[self.envelopes,0],self.data[self.envelopes,1])
-        except RegressionError as e:
-            if verbose:
-                print(e)
-            self.regressor = {'slope':0,'intercept':self.max()[1],'r2':0}
-        self._level = 3
-
-    def find_local_corrected_weight(self):
-        if self._level<3:
-            raise MANIA2Error('Please first run find_local_regressor')
-        envs = self.data[self.envelopes,:]
-        tmp = list(map(self.regressor.correct,envs))
-        self._local_corrected_weights = tmp
-        self._local_corrected_weight = np.median(tmp)
-        self._level = 4
 
 
     def process(self):
@@ -318,55 +257,48 @@ class ST:
             return
         ax.text(0.05,-1,f'SUB:{self.subject}',color="black")
         ax.plot(self.data[:,0],self.data[:,1],'b*')
-        ax.axhline(noise_threshold,ls='--',color='black',lw=2,label="Global noise threshold")
-        if self._level>0:
-            ax.axhline(self.noise_threshold,ls='--',color='r',lw=2,label="Noise threshold")
-        if self._level>1:
+        if(len(self.envelopes)>0):
             ax.plot(self.data[self.envelopes,0],self.data[self.envelopes,1],'gs',ms=6,label="Envelope points")
-        if self._level>2:
-            x = self.data[self.envelopes,0]
-            z = list(map(self.regressor.predict,x))
-            ax.plot(x,z,'k',lw=2,label='Local regressor')
-            if (self.correction_type == 'envelope' or self.correction_type == 'above noise'):
-                try:
-                    R = ST.roi_regressors[self.subject][f's-{self.roi1}']
-                    if len(x)>0:
-                        c = R.correct([x[-1],z[-1]])
-                    else:
-                        t = self.max()
-                        x = [t[0]]
-                        z = [t[1]]
-                        c = R.correct([x[-1],z[-1]])
-                    ax.plot([0,x[-1]],[c,z[-1]],'r--',lw=2,label='SF regressor')
-                except KeyError:
-                    pass
-                try:
-                    R = ST.roi_regressors[self.subject][f't-{self.roi2}']
-                    if len(x)>0:
-                        c = R.correct([x[-1],z[-1]])
-                    else:
-                        t = self.max()
-                        x = [t[0]]
-                        z = [t[1]]
-                        c = R.correct([x[-1],z[-1]])
-                    ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='TF regressor')
-                except KeyError:
-                    pass
+            if self.regressor:
+                x = self.data[self.envelopes,0]
+                z = list(map(self.regressor.predict,x))
+                ax.plot(x,z,'k',lw=2,label='Local regressor')
+            # if (self.correction_type == 'envelope' or self.correction_type == 'above noise'):
+            #     try:
+            #         R = ST.roi_regressors[self.subject][f's-{self.roi1}']
+            #         if len(x)>0:
+            #             c = R.correct([x[-1],z[-1]])
+            #         else:
+            #             t = self.max()
+            #             x = [t[0]]
+            #             z = [t[1]]
+            #             c = R.correct([x[-1],z[-1]])
+            #         ax.plot([0,x[-1]],[c,z[-1]],'r--',lw=2,label='SF regressor')
+            #     except KeyError:
+            #         pass
+            #     try:
+            #         R = ST.roi_regressors[self.subject][f't-{self.roi2}']
+            #         if len(x)>0:
+            #             c = R.correct([x[-1],z[-1]])
+            #         else:
+            #             t = self.max()
+            #             x = [t[0]]
+            #             z = [t[1]]
+            #             c = R.correct([x[-1],z[-1]])
+            #         ax.plot([0,x[-1]],[c,z[-1]],'m--',lw=2,label='TF regressor')
+            #     except KeyError:
+            #         pass
 
-        if self.isConnected():
-            ax.set_facecolor((0/255,255/255,0/255,.2))
-        else:
-            ax.set_facecolor((80/255,80/255,80/255,.2))
-        # if self._level>3:
-        #     l = len(self.local_corrected_weights)
-        #     x = [0.0]*l
-        #     ax.plot(x,self.local_corrected_weights,'ko',ms=4,label='Local corrected weights')
-        #     ax.plot(0,self.local_corrected_weight,'k*',ms=6,label='Final corrected weight')
+        # if self.isConnected():
+        #     ax.set_facecolor((0/255,255/255,0/255,.2))
+        # else:
+        #     ax.set_facecolor((80/255,80/255,80/255,.2))
+
         ax.set_ylim(top=0)
         ax.set_xlim(left=-5)
         ax.axvline(0,lw=0.5,color='black')
-        ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
-        ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
+        # ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
+        # ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
         return ax
 
 class PairST:
@@ -426,13 +358,14 @@ class EnsembleST:
     In future, we may extend this class to contain a single ST
     from across a subject cohort.
     '''
-    def __init__(self,arg,**kwargs):
+    def __init__(self,arg=None,**kwargs):
         try:
             self.subject = kwargs['subject']
             self.mode = 0 # single subject mode
         except KeyError:
             self._mode = 1
-        self.data = arg
+        if arg:
+            self.data = arg
         self.roi_regressors = None
 
     @property
@@ -450,25 +383,6 @@ class EnsembleST:
             self._data = arg
             self._sts = {(xx.roi1,xx.roi2):i for i,xx in enumerate(arg)}
             self._rois = set([item for sublist in self._sts.keys() for item in sublist])
-        elif isinstance(tmp,PairST):
-            self._data = [tmp.st1]*2*len(arg)
-            self._sts = {}
-            self._rois = set([])
-            for i,pair in enumerate(arg):
-                self._data[2*i] = pair.st1
-                self._data[2*i+1] = pair.st2
-                self._sts[(pair.st1.roi1,pair.st1.roi2)] = 2*i
-                self._sts[(pair.st2.roi1,pair.st2.roi2)] = 2*i + 1
-                self._rois.add(pair.st1.roi1)
-                self._rois.add(pair.st2.roi1)
-                self._rois.add(pair.st1.roi2)
-                self._rois.add(pair.st2.roi2)
-        elif isinstance(tmp,str):
-            assert self.mode==0, 'API only works in a single subject mode - Please specify subject ID -> (subject=ID)'
-            data = getdata_sts(self.subject,arg)
-            self._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(data)}
-            self._data = [ST(self.subject,*xx.values()) for xx in data]
-            self._rois = set(arg)
         else:
             raise ValueError('Ensemble constructor arguments not known!')
 
@@ -488,6 +402,10 @@ class EnsembleST:
 
     def __len__(self):
         return len(self.data)
+
+    def __iter__(self):
+        for st in self.data:
+            yield st
 
     def noise_spectrum(self):
         for st in self.data:
@@ -645,153 +563,6 @@ class EnsembleST:
         ax[1].set_title(f'{roi}:Target-fixed regressor',fontsize=18)
 
 
-    def find_corrected_weights(self):
-        for conn in self.data:
-            if conn.isNull():
-                conn.corrected_weights = []
-                continue
-            if len(conn.envelopes)>0:
-                envs = conn.data[conn.envelopes,:]
-            elif conn.max()[1]>noise_threshold:
-                # no envelope point but above noise points
-                envs = conn.data[conn.argmax(),:].reshape(1,-1)
-            else:
-                conn.corrected_weights = []
-                continue
-            Rs = self.roi_regressors['s-'+conn.roi1]
-            Rt = self.roi_regressors['t-'+conn.roi2]
-            tmp = list(map(Rs.correct,envs))+list(map(Rt.correct,envs))
-            conn.corrected_weights = tmp
-
-    def get_matrix1(self):
-        '''
-        Matrix1 elements are based on the strongest connected seed between two
-        terminal ROIs
-        '''
-        try:
-            return self.matrix1
-        except AttributeError:
-            pass
-        l = len(self.rois)
-        mat = np.zeros((l,l))
-        rois = sorted(self.rois)
-        for i,roi1 in enumerate(rois):
-            for j,roi2 in enumerate(rois):
-                if roi1==roi2:continue
-                ind = self._sts[(roi1,roi2)]
-                conn = self.data[ind]
-                mat[i,j] = np.exp(conn.weight)*NOS
-        self.matrix1 = mat
-        return mat
-
-    def get_matrix2(self):
-        """
-        Matrix2 elements are corrected by our distance correction framework
-        """
-        try:
-            return self.matrix2
-        except AttributeError:
-            pass
-        l = len(self.rois)
-        mat = np.zeros((l,l))
-        rois = sorted(self.rois)
-
-        """# Different modes of correction applied to pairST
-        for i,roi1 in enumerate(rois[:l-1]):
-            for j,roi2 in enumerate(rois[i+1:]):
-                ind = self._sts[(roi1,roi2)]
-                ind_reverse = self._sts[(roi2,roi1)]
-                conn = self.data[ind]
-                conn_reverse = self.data[ind_reverse]
-
-                # check if a direction is null -> no correction
-                if conn.isNull() or conn_reverse.isNull():
-                    mat[i,j+i+1] = np.exp(conn.weight)*NOS
-                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*NOS
-                    conn.correction_type = 'null'
-                    conn_reverse.correction_type = 'null'
-                    continue
-
-                # check if a direction is strongly adjacent -> no correction
-                if (conn.isAdjacent(True) or conn_reverse.isAdjacent(True)):
-                    mat[i,j+i+1] = np.exp(conn.weight)*NOS
-                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*NOS
-                    conn.correction_type = 'strongly adjacent'
-                    conn_reverse.correction_type = 'strongly adjacent'
-                    continue
-
-                # check if both have envelope points -> correction applied
-                if (len(conn.envelopes)>0 and len(conn_reverse.envelopes)>0):
-                    mat[i,j+i+1] = np.exp(min(conn.corrected_weight,0))*NOS
-                    mat[j+i+1,i] = np.exp(min(conn_reverse.corrected_weight,0))*NOS
-                    conn.correction_type = 'envelope'
-                    conn_reverse.correction_type = 'envelope'
-                    continue
-
-                # check if both are above noise -> correction applied
-                if (conn.max()[1]>noise_threshold and conn_reverse.max()[1]>noise_threshold):
-                    mat[i,j+i+1] = np.exp(min(conn.corrected_weight,0))*NOS
-                    mat[j+i+1,i] = np.exp(min(conn_reverse.corrected_weight,0))*NOS
-                    conn.correction_type = 'above noise'
-                    conn_reverse.correction_type = 'above noise'
-                    continue
-                else:
-                    # fallback no correction
-                    mat[i,j+i+1] = np.exp(conn.weight)*NOS
-                    mat[j+i+1,i] = np.exp(conn_reverse.weight)*NOS
-                    conn.correction_type = 'fallback'
-                    conn_reverse.correction_type = 'fallback'"""
-
-        for i, roi1 in enumerate(rois):
-            for j, roi2 in enumerate(rois):
-                if i == j:
-                    continue
-                ind = self._sts[(roi1, roi2)]
-                conn = self.data[ind]
-                # check if a direction is null -> no correction
-                if conn.isNull():
-                    mat[i, j] = np.exp(conn.weight)*NOS
-                    conn.correction_type = 'null'
-                    continue
-                # check if a direction is strongly adjacent -> no correction
-                if conn.isAdjacent(True):
-                    mat[i, j] = np.exp(conn.weight)*NOS
-                    conn.correction_type = 'strongly adjacent'
-                    continue
-                # check if there are envelope points -> correction applied
-                if len(conn.envelopes)>0:
-                    mat[i, j] = np.exp(min(conn.corrected_weight,0))*NOS
-                    conn.correction_type = 'envelope'
-                    continue
-                # check if above noise -> correction applied
-                if conn.max()[1]>noise_threshold:
-                    mat[i, j] = np.exp(min(conn.corrected_weight,0))*NOS
-                    conn.correction_type = 'above noise'
-                    continue
-                else:
-                    # fallback no correction
-                    mat[i, j] = np.exp(conn.weight)*NOS
-                    conn.correction_type = 'fallback'
-        self.matrix2 = mat
-        return mat
-
-    def run_mania1(self):
-        '''
-        Running MANIA on matrix1
-        '''
-        net,den,nar,t = mania_on_mat(self.matrix1)
-        ind = np.argmin(nar)
-        self.threshold1 = t[ind]
-        self.mania1_network = net
-
-    def run_mania2(self):
-        '''
-        Running MANIA on matrix2
-        '''
-        net,den,nar,t = mania_on_mat(self.matrix2)
-        ind = np.argmin(nar)
-        self.threshold2 = t[ind]
-        self.mania2_network = net
 
     def is_connected(self, roi1, roi2, mania2=True):
         """Return whether a connection exists between the ROIs in the MANIA network generated
@@ -811,35 +582,6 @@ class EnsembleST:
         else:
             return bool(self.mania1_network[ind1, ind2])
 
-    def save_to_db(self, run_id=None):
-        """Save the connections between all the ROIs to Neo4j database
-
-        :return: None
-        """
-        rois = sorted(self.rois)
-        for roi1 in tqdm(rois, desc='ROIs'):
-            for roi2 in rois:
-                if roi1 == roi2: continue
-                ind = self._sts[(roi1, roi2)]
-                conn = self.data[ind]
-                attributes = {'SUBJECT':self.subject,
-                              'corrected_weight': conn.corrected_weight,
-                              'corrected_weights': conn.corrected_weights,
-                              'correction_type': conn.correction_type,
-                              'noise_threshold': conn.noise_threshold,
-                              'threshold1':self.threshold1,
-                              'threshold2':self.threshold2,
-                              'is_adjacent': conn.isAdjacent(True),
-                              'is_connected': self.is_connected(roi1, roi2),
-                              'is_connected_mania1': self.is_connected(roi1, roi2, mania2=False),
-                              'regressor': conn.regressor.to_list(),
-                              'envelope': conn.envelopes,
-                              'weight': conn.weight,
-                              'weights': conn.weights
-                              }
-                if run_id is not None:
-                    attributes['run_id'] = run_id
-                write_connection(roi1, roi2, 'MANIA2', attributes)
 
     def plot_mania(self):
         _,den1,nar1,t1 = mania_on_mat(self.matrix1)
@@ -895,7 +637,6 @@ def compute_subject(subject, save=False):
     if save:
         sub.save_to_db(run_id='No Reverse')
         update_roi_regressor(sub)
-    # print('Completed subject %s' % subject)
     return sub
 
 
