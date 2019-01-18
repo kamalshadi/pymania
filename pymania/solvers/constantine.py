@@ -66,8 +66,8 @@ class Constantine(Solver):
                         try:
                             reg = lslinear(xs,ys)
                         except RegressionError:
-                            reg = {slope:0,intercept:0,r2:0}
-                        reg4 = Regressor(reg.slope,reg.intercept,reg.r2,'poolEnvelopes')
+                            reg = {'slope':0,'intercept':0,'r2':0}
+                        reg4 = Regressor(reg['slope'],reg['intercept'],reg['r2'],'poolEnvelopes')
                         for reg in [reg1,reg2,reg3,reg4]:
                             if bestR.r2<reg.r2:
                                 bestR = reg
