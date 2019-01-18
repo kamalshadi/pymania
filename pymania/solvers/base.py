@@ -173,9 +173,9 @@ class Solver(ABC):
                               'regressor': conn.regressor.to_list(),
                               'envelope': conn.envelopes,
                               'weight': conn.weight,
-                              'weights': conn.weights
+                              'weights': conn.weights,
+                              'regressor_type':conn.regressor_type
                               }
 
                 attributes['run_id'] = self.name + '_' + self.id
-                attributes['run_id'] = 'test'
                 self.backend.write_connection(roi1, roi2, 'MANIA2', attributes)

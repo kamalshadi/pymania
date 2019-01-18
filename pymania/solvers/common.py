@@ -71,50 +71,56 @@ def find_envelope_points(arg,noise_threshold):
                 env1.append(k)
             else:
                 env2.append(k)
-        st1._envelopes = env1
-        st2._envelopes = env2
+        st1._envelopes_pair = env1
+        st2._envelopes_pair = env2
 
 
-def find_local_regressor(arg):
+def find_local_regressor(arg,save=True):
     if isinstance(arg,ST):
         st = arg
         if st.isNull():
             tmp = np.log(1/config.NOS)
-            st.regressor = {'slope':0,'intercept':tmp,'r2':0}
+            regressor = {'slope':0,'intercept':tmp,'r2':0}
             return
         try:
-            st.regressor = lslinear(st.data[st.envelopes,0],st.data[st.envelopes,1])
+            regressor = lslinear(st.data[st.envelopes,0],st.data[st.envelopes,1])
         except RegressionError as e:
-            st.regressor = {'slope':0,'intercept':st.max()[1],'r2':0}
+            regressor = {'slope':0,'intercept':st.max()[1],'r2':0}
+        if save:
+            st.regressor = regressor
+        return Regressor(regressor.slope,regressor.intercept,regressor.r2)
     else:
         st1 = arg.st1
         st2 = arg.st2
         if st1.isNull() or st2.isNull():
             tmp = np.log(1/config.NOS)
-            st1.regressor = {'slope':0,'intercept':tmp,'r2':0}
-            st2._regressor = st1.regressor
-            return
+            regressor = {'slope':0,'intercept':tmp,'r2':0}
+            reg1 = Regressor(regressor.slope,regressor.intercept,regressor.r2)
+            reg2 = reg1
         elif st1.isNull():
-            find_local_regressor(st2)
-            st1._regressor = st2.regressor
-            return
+            reg2 = find_local_regressor(st2,False)
+            reg1 = reg2
         elif st2.isNull():
-            find_local_regressor(st1)
-            st2._regressor = st1.regressor
-            return
+            reg1 = find_local_regressor(st1,False)
+            reg2 = reg1
         else:
             x = list(st1.data[st1.envelopes,0])+list(st2.data[st2.envelopes,0])
             y = list(st1.data[st1.envelopes,1])+list(st2.data[st2.envelopes,1])
             try:
-                st1.regressor = lslinear(x,y)
-                st2._regressor = st1.regressor
+                regressor = lslinear(x,y)
+                reg1 = Regressor(regressor.slope,regressor.intercept,regressor.r2)
+                reg2 = reg1
             except RegressionError as e:
-                st1.regressor = {'slope':0,'intercept':st1.max()[1],'r2':0}
-                st2.regressor = {'slope':0,'intercept':st2.max()[1],'r2':0}
+                regressor = {'slope':0,'intercept':st1.max()[1],'r2':0}
+                reg1 = Regressor(regressor.slope,regressor.intercept,regressor.r2)
+                regressor = {'slope':0,'intercept':st2.max()[1],'r2':0}
+                reg2 = Regressor(regressor.slope,regressor.intercept,regressor.r2)
+
 
 
 
 def find_corrected_weights(st):
+    st.regressor_type = st.regressor.kind
     if st.isNull():
         st._corrected_weights = []
         st._corrected_weight = np.log(1/config.NOS)
@@ -125,17 +131,29 @@ def find_corrected_weights(st):
         st._corrected_weight = st.max()[1]
         st.correction_type = 'Adjacent'
         return
-    if len(st.envelopes)>0:
+
+    if st.regressor.kind == 'poolAll':
+        correction_indices = st.regressor._envelopes_pair
+    else:
+        correction_indices = st.regressor._envelopes
+
+    if len(correction_indices)>0:
         if st.regressor.r2>=config.MIN_R2:
             st.correction_type = 'Regress'
-            envs = st.data[st.envelopes,:]
+            envs = st.data[correction_indices,:]
             tmp = list(map(st.regressor.correct,envs))
         else:
             st.correction_type = 'Bad regressor'
             tmp = [st.max()[1]]
     else:
-        st.correction_type = 'No Envelope'
-        tmp = st.max()
-        tmp = [st.regressor.correct(tmp)]
+        if st.regressor.r2>=config.MIN_R2:
+            st.correction_type = 'No Envelope but regress'
+            tmp = st.max()
+            tmp = [st.regressor.correct(tmp)]
+        else:
+            st.correction_type = 'No Envelope No regress'
+            tmp = st.max()
+            tmp = [tmp[1]]
+
     st._corrected_weights = tmp
     st._corrected_weight = np.median(tmp)

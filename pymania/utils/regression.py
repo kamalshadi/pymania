@@ -6,8 +6,8 @@ class RegressionError(Exception):
     pass
 
 def lslinear(x,y):
-    if len(x)<2:
-        raise RegressionError('Cannot regress with fewer than two points.')
+    if len(x)<config.MIN_REGRESSION_POINTS:
+        raise RegressionError('Cannot regress with fewer than required points.')
     D = {}
     w = sorted(zip(x,y))
     x = [xx[0] for xx in w]
@@ -24,11 +24,12 @@ def lslinear(x,y):
 
 
 class Regressor:
-    def __init__(self,slope,intercept,r2,popt=None):
+    def __init__(self,slope,intercept,r2,kind='independent',popt=None):
         self.slope = slope
         self.intercept = intercept
         self.r2 = r2
         self.popt = popt
+        self.kind = kind
 
     def __str__(self):
         return f'Regressor({self.slope:.3f},{self.intercept:.3f},{self.r2:.0f})'
@@ -50,8 +51,8 @@ class Regressor:
 
         :return: A list with three elements: Slope, Intercept and R2
         """
-        return [self.slope,self.intercept, self.r2]
+        return [self.slope, self.intercept, self.r2, self.kind]
 
 def create_null_regressor():
     tmp = np.log(1/config.NOS)
-    return Regressor(0,tmp,0)
+    return Regressor(0,tmp,0,'Null')

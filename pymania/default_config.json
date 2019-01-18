@@ -1,5 +1,6 @@
 {
   "NOS":5000,
   "MIN_POINTS_ON_RIGHT":5,
-  "MIN_R2":70
+  "MIN_R2":70,
+  "MIN_REGRESSION_POINTS":5
 }
