@@ -89,7 +89,7 @@ def find_local_regressor(arg):
     else:
         st1 = arg.st1
         st2 = arg.st2
-        if st1.isNull() and st2.isNull():
+        if st1.isNull() or st2.isNull():
             tmp = np.log(1/config.NOS)
             st1.regressor = {'slope':0,'intercept':tmp,'r2':0}
             st2._regressor = st1.regressor
@@ -135,6 +135,7 @@ def find_corrected_weights(st):
             tmp = [st.max()[1]]
     else:
         st.correction_type = 'No Envelope'
-        tmp = [st.max()[1]]
+        tmp = st.max()
+        tmp = [st.regressor.correct(tmp)]
     st._corrected_weights = tmp
     st._corrected_weight = np.median(tmp)

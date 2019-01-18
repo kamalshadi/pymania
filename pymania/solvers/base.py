@@ -124,7 +124,7 @@ class Solver(ABC):
 
     @is_loaded
     @pipeline(-1)
-    def run_mania2(self):
+    def run_mania2(self,save=False):
         '''
         Running MANIA on matrix1
         '''
@@ -136,7 +136,7 @@ class Solver(ABC):
             ind = np.argmin(nar)
             subject.threshold2 = t[ind]
             subject.mania2_network = net
-            self.save_to_db(subject)
+            if save:self.save_to_db(subject)
 
 
     @is_loaded
