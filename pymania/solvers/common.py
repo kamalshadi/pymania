@@ -138,9 +138,9 @@ def find_corrected_weights(st):
         return
 
     if st.regressor.kind == 'poolAll':
-        correction_indices = st.regressor._envelopes_pair
+        correction_indices = st._envelopes_pair
     else:
-        correction_indices = st.regressor._envelopes
+        correction_indices = st._envelopes
 
     if len(correction_indices)>0:
         if st.regressor.r2>=config.MIN_R2:

@@ -57,17 +57,20 @@ class Constantine(Solver):
                         reg3 = find_local_regressor(pair,False)
                         reg3.kind = 'poolAll'
 
-                        a = pair.st1.data[pair.st1.envelopes,0]
-                        b = pair.st2.data[pair.st2.envelopes,0]
-                        xs = np.concatenate([a,b])
-                        a = pair.st1.data[pair.st1.envelopes,1]
-                        b = pair.st2.data[pair.st2.envelopes,1]
-                        ys = np.concatenate([a,b])
-                        try:
-                            reg = lslinear(xs,ys)
-                        except RegressionError:
-                            reg = {'slope':0,'intercept':0,'r2':0}
-                        reg4 = Regressor(reg['slope'],reg['intercept'],reg['r2'],'poolEnvelopes')
+                        if len(pair.st1.envelopes)<1 or len(pair.st2.envelopes)<1:
+                            reg4 = create_null_regressor()
+                        else:
+                            a = pair.st1.data[pair.st1.envelopes,0]
+                            b = pair.st2.data[pair.st2.envelopes,0]
+                            xs = np.concatenate([a,b])
+                            a = pair.st1.data[pair.st1.envelopes,1]
+                            b = pair.st2.data[pair.st2.envelopes,1]
+                            ys = np.concatenate([a,b])
+                            try:
+                                reg = lslinear(xs,ys)
+                            except RegressionError:
+                                reg = {'slope':0,'intercept':0,'r2':0}
+                            reg4 = Regressor(reg['slope'],reg['intercept'],reg['r2'],'poolEnvelopes')
                         for reg in [reg1,reg2,reg3,reg4]:
                             if bestR.r2<reg.r2:
                                 bestR = reg
