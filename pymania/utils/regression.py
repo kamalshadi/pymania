@@ -51,7 +51,7 @@ class Regressor:
 
         :return: A list with three elements: Slope, Intercept and R2
         """
-        return [self.slope, self.intercept, self.r2, self.kind]
+        return [self.slope, self.intercept, self.r2]
 
 def create_null_regressor():
     tmp = np.log(1/config.NOS)

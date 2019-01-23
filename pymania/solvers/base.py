@@ -124,7 +124,7 @@ class Solver(ABC):
 
     @is_loaded
     @pipeline(-1)
-    def run_mania2(self,save=False):
+    def run_mania2(self,save=True):
         '''
         Running MANIA on matrix1
         '''
@@ -142,14 +142,12 @@ class Solver(ABC):
     @is_loaded
     @pipeline(-1)
     @abstractmethod
-    def run(self):
+    def run(self, save=False):
         self.get_matrix1()
         self.get_matrix2()
         self.run_mania1()
         self.run_mania2()
 
-    @is_loaded
-    @pipeline(-1)
     def save_to_db(self,subject):
         """Save the connections between all the ROIs to Neo4j database
         :return: None

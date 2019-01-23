@@ -83,7 +83,10 @@ class Constantine(Solver):
     def find_corrected_weights(self):
         for subject in self:
             for st in subject:
-                find_corrected_weights(st)
+                if self.id.lower().startswith('sparse'):
+                    find_corrected_weights(st, sparse=True)
+                else:
+                    find_corrected_weights(st, sparse=False)
 
     @is_loaded
     def run(self):

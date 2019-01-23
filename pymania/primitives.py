@@ -95,7 +95,7 @@ class ST:
     def threshold1(self):
         if self._mania_loaded:
             return self._threshold1
-        raise MANIA2ERROR('Please run load_mania_results first')
+        raise MANIA2Error('Please run load_mania_results first')
 
     @property
     def threshold2(self):
