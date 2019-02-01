@@ -138,7 +138,7 @@ class Solver(ABC):
                     ind = subject._sts[(roi1,roi2)]
                     conn = subject.data[ind]
                     if self.run_id in [RunId.VerySparse, RunId.Dense] and conn.corrected_weight > 0:
-                            mat[i,j] = conn.weight
+                        mat[i, j] = np.exp(conn.weight) * config.NOS
                     else:
                         tmp = min(conn.corrected_weight,0)
                         mat[i,j] = np.exp(tmp)*config.NOS
