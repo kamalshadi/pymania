@@ -2,6 +2,15 @@ from abc import ABC, abstractmethod
 from pymania.primitives import *
 import numpy as np
 from .pipeline import *
+from enum import Enum
+
+
+class RunId(Enum):
+    VerySparse = 1
+    Sparse = 2
+    Dense = 3
+    VeryDense = 4
+
 
 class Solver(ABC):
     def __init__(self,name,backend,id,num_steps=5):
@@ -13,6 +22,16 @@ class Solver(ABC):
         self._rois = set([])
         self._loaded = False
         self.order = 0
+        if 'vsparse' in id:
+            self.run_id = RunId.VerySparse
+        elif 'sparse' in id:
+            self.run_id = RunId.Sparse
+        elif 'vdense' in id:
+            self.run_id = RunId.VeryDense
+        elif 'dense' in id:
+            self.run_id = RunId.Dense
+        else:
+            raise MANIA2Error
 
     @property
     def subjects(self):
@@ -118,8 +137,11 @@ class Solver(ABC):
                     if roi1==roi2:continue
                     ind = subject._sts[(roi1,roi2)]
                     conn = subject.data[ind]
-                    tmp = min(conn.corrected_weight,0)
-                    mat[i,j] = np.exp(tmp)*config.NOS
+                    if self.run_id in [RunId.VerySparse, RunId.Dense] and conn.corrected_weight > 0:
+                            mat[i,j] = conn.weight
+                    else:
+                        tmp = min(conn.corrected_weight,0)
+                        mat[i,j] = np.exp(tmp)*config.NOS
             subject.matrix2 = mat
 
     @is_loaded
@@ -165,7 +187,7 @@ class Solver(ABC):
                               'noise_threshold': conn.noise_threshold,
                               'threshold1':subject.threshold1,
                               'threshold2':subject.threshold2,
-                              'is_adjacent': conn.isAdjacent(True),
+                              'is_adjacent': conn.isAdjacent(False),
                               'is_connected': subject.is_connected(roi1, roi2),
                               'is_connected_mania1': subject.is_connected(roi1, roi2, mania2=False),
                               'regressor': conn.regressor.to_list(),

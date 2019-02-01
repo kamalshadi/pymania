@@ -101,7 +101,7 @@ class ST:
     def threshold2(self):
         if self._mania_loaded:
             return self._threshold2
-        raise MANIA2ERROR('Please run load_mania_results first')
+        raise MANIA2Error('Please run load_mania_results first')
 
 
     @property
@@ -165,7 +165,16 @@ class ST:
             raise MANIA2Error("Corrected weight not found")
 
     def isConnected(self,mania2=True):
-        return self._is_connected if mania2 else self._is_connected_mania1
+        if mania2:
+            if self.corrected_weight is not None:
+                return self.corrected_weight >= self.threshold2
+            else:
+                return None
+        else:
+            if self.weight is not None:
+                return self.weight >= self.threshold1
+            else:
+                return None
 
 
     def find_noise_threshold(self):
@@ -242,6 +251,27 @@ class ST:
         self.find_local_regressor()
         self.find_local_corrected_weight()
 
+    def get_type(self):
+        sparse = False
+        if self.correction_type == 'Null':
+            return 'Null'
+        if self.correction_type == 'Adjacent':
+            return 'Adjacent'
+        if self.correction_type in ['Bad regressor', 'No Envelope No regress']:
+            return 'No Correction'
+        if self.correction_type == 'Regress' and self.regressor.kind == 'independent':
+            return 'Independent'
+        if sparse:
+            if self.regressor.kind in ['direction1', 'direction2', 'poolAll', 'poolEnvelopes']:
+                return 'No Correction'
+        else:
+            if self.regressor.kind == 'direction1' or self.regressor.kind == 'direction2':
+                return 'one direction'
+            if self.regressor.kind == 'poolAll' or self.regressor.kind == 'poolEnvelopes':
+                return self.regressor.kind
+        if self.correction_type == 'No Correction':
+            return 'No Correction'
+        print('Error while evaluating: ', self.correction_type, self.regressor.kind)
 
     def plot(self,ax = None):
         if ax is None:
@@ -250,7 +280,7 @@ class ST:
         ax.set_xlabel('Distance (mm)',fontsize=18)
         ax.set_ylabel(r'$T_{log}$',fontsize=18)
         ax.set_xlabel('Distance (mm)',fontsize=18)
-        ax.set_title(f'{self.roi1}->{self.roi2}-({self.correction_type})',fontsize=18)
+        ax.set_title(f'{self.roi1}->{self.roi2}-({self.get_type()})',fontsize=18)
         if self.isNull():
             ax.set_facecolor('#000000')
             ax.text(0.05,.9,f'SUB:{self.subject}',color="white")
@@ -289,16 +319,16 @@ class ST:
             #     except KeyError:
             #         pass
 
-        # if self.isConnected():
-        #     ax.set_facecolor((0/255,255/255,0/255,.2))
-        # else:
-        #     ax.set_facecolor((80/255,80/255,80/255,.2))
+        if self.isConnected():
+            ax.set_facecolor((0/255,255/255,0/255,.2))
+        else:
+            ax.set_facecolor((80/255,80/255,80/255,.2))
 
         ax.set_ylim(top=0)
         ax.set_xlim(left=-5)
         ax.axvline(0,lw=0.5,color='black')
-        # ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
-        # ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
+        ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
+        ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
         return ax
 
 class PairST:
