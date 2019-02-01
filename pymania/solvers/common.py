@@ -130,7 +130,7 @@ def find_corrected_weights(st, sparse=False):
         st._corrected_weight = np.log(1/config.NOS)
         st.correction_type = 'Null'
         return
-    if st.isAdjacent(True):
+    if st.isAdjacent(False):
         st._corrected_weights = [st.max()[1]]
         st._corrected_weight = st.max()[1]
         st.correction_type = 'Adjacent'

@@ -4,7 +4,7 @@ Envelope Points -> Local Regressor -> Correction
 '''
 
 from .common import *
-from .base import Solver
+from .base import Solver, RunId
 from ..config import *
 from .pipeline import *
 
@@ -83,7 +83,7 @@ class Constantine(Solver):
     def find_corrected_weights(self):
         for subject in self:
             for st in subject:
-                if self.id.lower().startswith('sparse'):
+                if self.run_id in [RunId.Sparse, RunId.VerySparse]:
                     find_corrected_weights(st, sparse=True)
                 else:
                     find_corrected_weights(st, sparse=False)
