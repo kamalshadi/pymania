@@ -158,7 +158,8 @@ class Solver(ABC):
             ind = np.argmin(nar)
             subject.threshold2 = t[ind]
             subject.mania2_network = net
-            if save:self.save_to_db(subject)
+            if 'temp' not in self.id:
+                self.save_to_db(subject)
 
 
     @is_loaded
