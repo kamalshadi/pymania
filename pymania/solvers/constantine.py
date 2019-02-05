@@ -34,6 +34,16 @@ class Constantine(Solver):
                     find_envelope_points(pair.st1,self.noise_threshold)
                     find_envelope_points(pair.st2,self.noise_threshold)
 
+    def is_regressor_good(self, st, regressor):
+        if self.run_id in [RunId.Sparse, RunId.VeryDense]:
+            return regressor.r2 >= config.MIN_R2
+        else:
+            if regressor.r2 < config.MIN_R2:
+                return False
+            envs = st.data[st._envelopes, :]
+            tmp = list(map(regressor.correct, envs))
+            return np.median(tmp) <= 0
+
     @is_loaded
     @pipeline(3)
     def find_local_regressors(self):
@@ -44,10 +54,13 @@ class Constantine(Solver):
                     pair = subject(roi1,roi2,True)
                     find_local_regressor(pair.st1)
                     find_local_regressor(pair.st2)
-                    if pair.st1.regressor.r2>=config.MIN_R2 and pair.st2.regressor.r2>=config.MIN_R2:
+                    if self.is_regressor_good(pair.st1, pair.st1.regressor) and self.is_regressor_good(pair.st2, pair.st2.regressor):
+                        pair.st1.regressor.is_good = True
+                        pair.st2.regressor.is_good = True
                         pass
                     else:
                         bestR = create_null_regressor()
+
                         reg1 = pair.st1.regressor
                         reg1.kind = 'direction1'
 
@@ -57,23 +70,11 @@ class Constantine(Solver):
                         reg3 = find_local_regressor(pair,False)
                         reg3.kind = 'poolAll'
 
-                        if len(pair.st1.envelopes)<1 or len(pair.st2.envelopes)<1:
-                            reg4 = create_null_regressor()
-                        else:
-                            a = pair.st1.data[pair.st1.envelopes,0]
-                            b = pair.st2.data[pair.st2.envelopes,0]
-                            xs = np.concatenate([a,b])
-                            a = pair.st1.data[pair.st1.envelopes,1]
-                            b = pair.st2.data[pair.st2.envelopes,1]
-                            ys = np.concatenate([a,b])
-                            try:
-                                reg = lslinear(xs,ys)
-                            except RegressionError:
-                                reg = {'slope':0,'intercept':0,'r2':0}
-                            reg4 = Regressor(reg['slope'],reg['intercept'],reg['r2'],'poolEnvelopes')
-                        for reg in [reg1,reg2,reg3,reg4]:
-                            if bestR.r2<reg.r2:
-                                bestR = reg
+                        for reg in [reg1,reg2,reg3]:
+                            if bestR.r2 < reg.r2:
+                                if self.is_regressor_good(pair.st1, reg) and self.is_regressor_good(pair.st2, reg):
+                                    bestR = reg
+                                    bestR.is_good = True
                         pair.st1._regressor = bestR
                         pair.st2._regressor = bestR
 

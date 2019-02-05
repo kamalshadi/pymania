@@ -148,28 +148,33 @@ def find_corrected_weights(st, sparse=False):
             tmp = [tmp[1]]
     else:
         # For dense version of algorithm
-        if st.regressor.kind == 'poolAll':
-            correction_indices = st._envelopes_pair
+        if st.regressor_type == 'independent':
+            st.correction_type = 'Regress'
+            envs = st.data[st._envelopes, :]
+            tmp = list(map(st.regressor.correct, envs))
         else:
-            correction_indices = st._envelopes
+            if st.regressor.kind == 'poolAll':
+                correction_indices = st._envelopes_pair
+            else:
+                correction_indices = st._envelopes
 
-        if len(correction_indices) > 0:
-            if st.regressor.r2 >= config.MIN_R2:
-                st.correction_type = 'Regress'
-                envs = st.data[correction_indices, :]
-                tmp = list(map(st.regressor.correct, envs))
+            if len(correction_indices) > 0:
+                if st.regressor.is_good:
+                    st.correction_type = 'Regress'
+                    envs = st.data[correction_indices, :]
+                    tmp = list(map(st.regressor.correct, envs))
+                else:
+                    st.correction_type = 'Bad regressor'
+                    tmp = [st.max()[1]]
             else:
-                st.correction_type = 'Bad regressor'
-                tmp = [st.max()[1]]
-        else:
-            if st.regressor.r2 >= config.MIN_R2:
-                st.correction_type = 'No Envelope but regress'
-                tmp = st.max()
-                tmp = [st.regressor.correct(tmp)]
-            else:
-                st.correction_type = 'No Envelope No regress'
-                tmp = st.max()
-                tmp = [tmp[1]]
+                if st.regressor.is_good:
+                    st.correction_type = 'No Envelope but regress'
+                    tmp = st.max()
+                    tmp = [st.regressor.correct(tmp)]
+                else:
+                    st.correction_type = 'No Envelope No regress'
+                    tmp = st.max()
+                    tmp = [tmp[1]]
 
     st._corrected_weights = tmp
     st._corrected_weight = np.median(tmp)

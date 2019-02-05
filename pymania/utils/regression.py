@@ -30,6 +30,7 @@ class Regressor:
         self.r2 = r2
         self.popt = popt
         self.kind = kind
+        self.is_good = False
 
     def __str__(self):
         return f'Regressor({self.slope:.3f},{self.intercept:.3f},{self.r2:.0f})'
