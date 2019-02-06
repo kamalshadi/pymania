@@ -40,7 +40,12 @@ class Constantine(Solver):
         else:
             if regressor.r2 < config.MIN_R2:
                 return False
-            envs = st.data[st._envelopes, :]
+            if st.isNull():
+                return False
+            elif len(st._envelopes) == 0:
+                envs = [st.max()]
+            else:
+                envs = st.data[st._envelopes, :]
             tmp = list(map(regressor.correct, envs))
             return np.median(tmp) <= 0
 
