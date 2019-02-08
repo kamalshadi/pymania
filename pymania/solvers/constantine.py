@@ -34,7 +34,7 @@ class Constantine(Solver):
                     find_envelope_points(pair.st1,self.noise_threshold)
                     find_envelope_points(pair.st2,self.noise_threshold)
 
-    def is_regressor_good(self, st, regressor):
+    def is_regressor_good(self, st, envelopes, regressor):
         if self.run_id in [RunId.Sparse, RunId.VeryDense]:
             return regressor.r2 >= config.MIN_R2
         else:
@@ -42,10 +42,10 @@ class Constantine(Solver):
                 return False
             if st.isNull():
                 return False
-            elif len(st._envelopes) == 0:
+            elif len(envelopes) == 0:
                 envs = [st.max()]
             else:
-                envs = st.data[st._envelopes, :]
+                envs = st.data[envelopes, :]
             tmp = list(map(regressor.correct, envs))
             return np.median(tmp) <= 0
 
@@ -59,7 +59,7 @@ class Constantine(Solver):
                     pair = subject(roi1,roi2,True)
                     find_local_regressor(pair.st1)
                     find_local_regressor(pair.st2)
-                    if self.is_regressor_good(pair.st1, pair.st1.regressor) and self.is_regressor_good(pair.st2, pair.st2.regressor):
+                    if self.is_regressor_good(pair.st1, pair.st1._envelopes, pair.st1.regressor) and self.is_regressor_good(pair.st2, pair.st2._envelopes, pair.st2.regressor):
                         pair.st1.regressor.is_good = True
                         pair.st2.regressor.is_good = True
                         pass
@@ -77,7 +77,13 @@ class Constantine(Solver):
 
                         for reg in [reg1,reg2,reg3]:
                             if bestR.r2 < reg.r2:
-                                if self.is_regressor_good(pair.st1, reg) and self.is_regressor_good(pair.st2, reg):
+                                if reg.kind == 'poolAll':
+                                    env1 = pair.st1._envelopes_pair
+                                    env2 = pair.st2._envelopes_pair
+                                else:
+                                    env1 = pair.st1._envelopes
+                                    env2 = pair.st2._envelopes
+                                if self.is_regressor_good(pair.st1, env1, reg) and self.is_regressor_good(pair.st2, env2, reg):
                                     bestR = reg
                                     bestR.is_good = True
                         pair.st1._regressor = bestR

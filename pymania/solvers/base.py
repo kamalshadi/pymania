@@ -195,7 +195,8 @@ class Solver(ABC):
                               'envelope': conn.envelopes,
                               'weight': conn.weight,
                               'weights': conn.weights,
-                              'regressor_type':conn.regressor_type
+                              'regressor_type':conn.regressor_type,
+                              'border':conn.border
                               }
 
                 attributes['run_id'] = self.name + '_' + self.id
