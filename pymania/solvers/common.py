@@ -80,17 +80,17 @@ def find_local_regressor(arg,save=True):
         st = arg
         if st.isNull():
             tmp = np.log(1/config.NOS)
-            regressor = {'slope':0,'intercept':tmp,'r2':0}
+            regressor = {'slope':0,'intercept':tmp,'r2':0, 'ME':0}
             if save:
                 st.regressor = regressor
-            return Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
+            return Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
         try:
             regressor = lslinear(st.data[st.envelopes,0],st.data[st.envelopes,1])
         except RegressionError as e:
-            regressor = {'slope':0,'intercept':st.max()[1],'r2':0}
+            regressor = {'slope':0,'intercept':st.max()[1],'r2':0, 'ME':0}
         if save:
             st.regressor = regressor
-        return Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
+        return Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
     else:
         st1 = arg.st1
         st2 = arg.st2
@@ -110,13 +110,13 @@ def find_local_regressor(arg,save=True):
             y = list(st1.data[st1.envelopes,1])+list(st2.data[st2.envelopes,1])
             try:
                 regressor = lslinear(x,y)
-                reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
+                reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
                 reg2 = reg1
             except RegressionError as e:
-                regressor = {'slope':0,'intercept':st1.max()[1],'r2':0}
-                reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
-                regressor = {'slope':0,'intercept':st2.max()[1],'r2':0}
-                reg2 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
+                regressor = {'slope':0,'intercept':st1.max()[1],'r2':0, 'ME':0}
+                reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
+                regressor = {'slope':0,'intercept':st2.max()[1],'r2':0, 'ME':0}
+                reg2 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
         if save:
             st1.regressor = reg1
             st2.regressor = reg2

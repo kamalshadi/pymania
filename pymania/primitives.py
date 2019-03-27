@@ -144,7 +144,7 @@ class ST:
 
     @regressor.setter
     def regressor(self,dic):
-        self._regressor = Regressor(dic['slope'],dic['intercept'],dic['r2'])
+        self._regressor = Regressor(dic['slope'],dic['intercept'],dic['r2'],dic['ME'])
 
     @property
     def corrected_weights(self):
@@ -327,8 +327,8 @@ class ST:
         ax.set_ylim(top=0)
         ax.set_xlim(left=-5)
         ax.axvline(0,lw=0.5,color='black')
-        ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
-        ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
+        # ax.axhline(np.log(self.threshold2/NOS),lw=2,color='magenta',label='MANIA2 threshold')
+        # ax.axhline(np.log(self.threshold1/NOS),lw=2,ls='dashed',color='magenta',label='MANIA1 threshold')
         return ax
 
 class PairST:
