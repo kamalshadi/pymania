@@ -137,7 +137,9 @@ class Solver(ABC):
                     if roi1==roi2:continue
                     ind = subject._sts[(roi1,roi2)]
                     conn = subject.data[ind]
-                    if self.run_id in [RunId.VerySparse, RunId.Dense] and conn.corrected_weight > 0:
+                    if self.run_id in [RunId.VerySparse] and conn.corrected_weight > 0:
+                        mat[i, j] = np.exp(conn.weight) * config.NOS
+                    elif self.run_id in [RunId.Dense] and conn.regressor_type != 'independent' and conn.corrected_weight > 0:
                         mat[i, j] = np.exp(conn.weight) * config.NOS
                     else:
                         tmp = min(conn.corrected_weight,0)

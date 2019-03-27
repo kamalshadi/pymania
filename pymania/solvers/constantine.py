@@ -59,7 +59,8 @@ class Constantine(Solver):
                     pair = subject(roi1,roi2,True)
                     find_local_regressor(pair.st1)
                     find_local_regressor(pair.st2)
-                    if self.is_regressor_good(pair.st1, pair.st1._envelopes, pair.st1.regressor) and self.is_regressor_good(pair.st2, pair.st2._envelopes, pair.st2.regressor):
+                    # if self.is_regressor_good(pair.st1, pair.st1._envelopes, pair.st1.regressor) and self.is_regressor_good(pair.st2, pair.st2._envelopes, pair.st2.regressor):
+                    if pair.st1.regressor.r2 >= config.MIN_R2 and pair.st2.regressor.r2 >= config.MIN_R2:
                         pair.st1.regressor.is_good = True
                         pair.st2.regressor.is_good = True
                         pass
