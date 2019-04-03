@@ -3,6 +3,7 @@ import numpy as np
 from ..utils import *
 from collections import deque
 from ..primitives import *
+import functools
 
 
 def find_noise_threshold(subject=None,st=None):
@@ -96,8 +97,8 @@ def find_local_regressor(arg,save=True):
         st2 = arg.st2
         if st1.isNull() or st2.isNull():
             tmp = np.log(1/config.NOS)
-            regressor = {'slope':0,'intercept':tmp,'r2':0}
-            reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'])
+            regressor = {'slope':0,'intercept':tmp,'r2':0, 'ME':0}
+            reg1 = Regressor(regressor['slope'],regressor['intercept'],regressor['r2'],regressor['ME'])
             reg2 = reg1
         elif st1.isNull():
             reg2 = find_local_regressor(st2,False)
@@ -129,11 +130,15 @@ def find_corrected_weights(st, sparse=False):
         st._corrected_weights = []
         st._corrected_weight = np.log(1/config.NOS)
         st.correction_type = 'Null'
+        st._corrected_weights_min = st._corrected_weights
+        st._corrected_weight_min = st._corrected_weight
         return
     if st.isAdjacent(False):
         st._corrected_weights = [st.max()[1]]
         st._corrected_weight = st.max()[1]
         st.correction_type = 'Adjacent'
+        st._corrected_weights_min = st._corrected_weights
+        st._corrected_weight_min = st._corrected_weight
         return
 
     if sparse:
@@ -142,16 +147,19 @@ def find_corrected_weights(st, sparse=False):
             st.correction_type = 'Regress'
             envs = st.data[st._envelopes, :]
             tmp = list(map(st.regressor.correct, envs))
+            tmp_min = list(map(functools.partial(st.regressor.correct, me=-1), envs))
         else:
             st.correction_type = 'No Correction'
             tmp = st.max()
             tmp = [tmp[1]]
+            tmp_min = tmp
     else:
         # For dense version of algorithm
         if st.regressor_type == 'independent':
             st.correction_type = 'Regress'
             envs = st.data[st._envelopes, :]
             tmp = list(map(st.regressor.correct, envs))
+            tmp_min = list(map(functools.partial(st.regressor.correct, me=-1), envs))
         else:
             if st.regressor.kind == 'poolAll':
                 correction_indices = st._envelopes_pair
@@ -163,18 +171,24 @@ def find_corrected_weights(st, sparse=False):
                     st.correction_type = 'Regress'
                     envs = st.data[correction_indices, :]
                     tmp = list(map(st.regressor.correct, envs))
+                    tmp_min = list(map(functools.partial(st.regressor.correct, me=-1), envs))
                 else:
                     st.correction_type = 'Bad regressor'
                     tmp = [st.max()[1]]
+                    tmp_min = tmp
             else:
                 if st.regressor.is_good:
                     st.correction_type = 'No Envelope but regress'
                     tmp = st.max()
                     tmp = [st.regressor.correct(tmp)]
+                    tmp_min = [st.regressor.correct(st.max(), me=-1)]
                 else:
                     st.correction_type = 'No Envelope No regress'
                     tmp = st.max()
                     tmp = [tmp[1]]
+                    tmp_min = tmp
 
     st._corrected_weights = tmp
     st._corrected_weight = np.median(tmp)
+    st._corrected_weights_min = tmp_min
+    st._corrected_weight_min = np.min(tmp_min)

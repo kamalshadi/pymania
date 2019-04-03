@@ -13,6 +13,7 @@ def lslinear(x,y):
     w = sorted(zip(x,y))
     x = [xx[0] for xx in w]
     y = [xx[1] for xx in w]
+    l = len(x)
     D['x'] = x
     D['y'] = y
     x = np.array(x).reshape(-1, 1)
@@ -32,7 +33,7 @@ def lslinear(x,y):
         nom += (y-yh)**2
         denom += (x-mx)**2
     se = np.sqrt(nom/(l-2))/np.sqrt(denom)
-    cv = stats.t.ppf(1 - 0.05/2, len(x)-2) # critical value
+    cv = stats.t.ppf(1 - 0.05/2, l-2) # critical value
     D['ME'] = cv*se # margin of error
     return D
 
