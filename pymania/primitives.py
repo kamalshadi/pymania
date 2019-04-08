@@ -242,6 +242,14 @@ class ST:
         '''
         return np.argmax(self.data,axis=0)[1]
 
+    def axonal_distance(self,threshold=5):
+        t = np.log(threshold/config.NOS)
+        if self.isAdjacent(False):return 0
+        for l,w in self.data:
+            if w>t:
+                return l
+        return np.nan
+
 
     def process(self):
         if self.isNull():
@@ -415,6 +423,48 @@ class EnsembleST:
             self._rois = set([item for sublist in self._sts.keys() for item in sublist])
         else:
             raise ValueError('Ensemble constructor arguments not known!')
+
+
+    def run_ranks(self,corrected=False,sparse=False):
+        def aux(weight):
+            tmp = int(config.NOS*np.exp(weight))
+            return min(tmp,config.NOS)
+
+        if not corrected:
+            ranked = sorted([(xx.roi1,xx.roi2,aux(xx.weight)) for xx in self.data],key=lambda x:x[-1],reverse=True)
+        else:
+            if sparse:
+                ranked = sorted(
+                [(xx.roi1,xx.roi2,aux(xx.corrected_weight))\
+                if xx.regressor.kind=='independent' else (xx.roi1,xx.roi2,aux(xx.weight))\
+                for xx in self.data],
+                key=lambda x:x[-1],reverse=True)
+            else:
+                ranked = sorted(
+                [(xx.roi1,xx.roi2,
+                aux(xx.corrected_weight)) for xx in self.data],
+                key=lambda x:x[-1],reverse=True)
+        self.ranked_sts = ranked
+        self.ranks = {}
+        for i,st in enumerate(ranked):
+            self.ranks[(st[0],st[1])] = (i,st[2])
+
+    def proportional_net(self,density_threshold=0.10):
+        self.run_ranks()
+        ind = int(len(self)*density_threshold)
+        N = len(self.rois)
+        inds = {xx:i for i,xx in enumerate(sorted(self.rois))}
+        net = np.zeros((N,N))
+        for i,rois in enumerate(self.ranked_sts[0:ind]):
+            r1 = rois[0]
+            r2 = rois[1]
+            ind1 = inds[r1]
+            ind2 = inds[r2]
+            net[ind1,ind2] = 1
+        return net
+
+
+
 
     def __call__(self,roi1,roi2,pair=False):
         '''

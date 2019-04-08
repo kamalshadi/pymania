@@ -2,12 +2,16 @@ from py2neo import Node, Relationship, Graph
 import json
 import numpy
 
-graph = Graph(host="canopus.cc.gatech.edu",password='1234')
+
 
 
 #################### reading from neo4j database #######################
 
 class backend:
+    graph = None
+    def connect(self):
+        graph = Graph(host="canopus.cc.gatech.edu",password='1234')
+
     def getdata_st(self,sub,roi1,roi2):
         """
         Args:

@@ -24,6 +24,37 @@ def mania_on_mat(B,nos = 5000,cut = 10, log=False):
 	net[B>=th] = 1
 	return (net,den,nar,t)
 
+def mania_on_rank(R,roi2ind,nos = 5000,cut=10):
+	m = len(R)
+	N = int(np.round(0.5*(1+(4*m)**.5)))
+	net = np.zeros((N,N))
+	den = [0.0]*m
+	nar = [np.nan]*m
+	t = [np.nan]*m
+	delta = 1/m
+	P0 = min(R[0][-1],5000)
+	for q,tup in enumerate(R):
+		roi1 = tup[0]
+		roi2 = tup[1]
+		i = roi2ind[roi1]
+		j = roi2ind[roi2]
+		weight = tup[-1]
+		net[i,j] = 1
+		den[q] += q*delta
+		if q<cut or q>m-cut or weight>=P0:
+			continue
+		t[q] = tup[-1]
+		nar[q] = NAR(net)
+	ind = np.nanargmin(nar)+1
+	net = np.zeros((N,N))
+	for q,tup in enumerate(R[:ind]):
+		roi1 = tup[0]
+		roi2 = tup[1]
+		i = roi2ind[roi1]
+		j = roi2ind[roi2]
+		net[i,j] = 1
+	return (net,den,nar,t)
+
 
 
 def AR(A):
