@@ -7,10 +7,10 @@ import numpy
 
 #################### reading from neo4j database #######################
 
-class backend:
+class Backend:
     graph = None
     def connect(self):
-        graph = Graph(host="canopus.cc.gatech.edu",password='1234')
+        Backend.graph = Graph(host="canopus.cc.gatech.edu",password='1234')
 
     def getdata_st(self,sub,roi1,roi2):
         """
@@ -25,7 +25,7 @@ class backend:
         query = f'''match (n:ROI)-[r:NOS]->(m:ROI)
         where n.name="{roi1}" and m.name="{roi2}" and r.SUBJECT={sub}
         return n.name as n1,m.name as n2,r._length as _length,r._weight as _weight,r.border as border'''
-        A = graph.run(query).data()
+        A = Backend.graph.run(query).data()
         return A[0]
 
     def getmania_st(self,sub,roi1,roi2):
@@ -43,7 +43,7 @@ class backend:
         return r.correction_type as correction_type,r.is_connected as is_connected,
         r.is_connected_mania1 as is_connected_mania1, r.threshold1 as threshold1, r.threshold2 as threshold2,
         r.corrected_weights as corrected_weights'''
-        A = graph.run(query).data()
+        A = Backend.graph.run(query).data()
         return A[0]
 
 
@@ -52,7 +52,7 @@ class backend:
         query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                     WHERE n.name IN {roi_list} AND m.name IN {roi_list} AND r.SUBJECT={sub}
                     RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
-        out = graph.run(query).data()
+        out = Backend.graph.run(query).data()
         return out
 
 
@@ -61,7 +61,7 @@ class backend:
         query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                     WHERE n.name='{st.roi1}' AND m.name='{st.roi2}' AND r.SUBJECT IN {sub_list}
                     RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
-        out = graph.run(query).data()
+        out = Backend.graph.run(query).data()
         return out
 
 
@@ -70,11 +70,11 @@ class backend:
         query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                     WHERE n.name='{st.roi1}' AND m.name='{st.roi2}' AND r.SUBJECT IN {sub_list}
                     RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
-        out = graph.run(query).data()
+        out = Backend.graph.run(query).data()
         query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
                     WHERE n.name='{st.roi2}' AND m.name='{st.roi1}' AND r.SUBJECT IN {sub_list}
                     RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
-        out.extend(graph.run(query).data())
+        out.extend(Backend.graph.run(query).data())
         return out
 
 
@@ -89,7 +89,7 @@ class backend:
         Returns:
             dict: ROI regressor for the subject. If subject is None, ROI regressor for all subjects
         """
-        roi_regressor = graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
+        roi_regressor = Backend.graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
         if roi_regressor is None or roi_regressor == '':
             roi_regressor = '{}'
         roi_regressor_dict = json.loads(roi_regressor)
@@ -124,7 +124,7 @@ class backend:
                 attribs += str(key) + ':' + str(attributes[key]) + ', '
         query = match + attribs[:-2] + '}]->(m)'
         if run:
-            graph.run(query)
+            Backend.graph.run(query)
         else:
             return query
 
@@ -156,7 +156,7 @@ class backend:
                 attribs += 'r.' + str(key) + '=' + str(attributes[key]) + ', '
         query = match + attribs[:-2]
         if run:
-            graph.run(query)
+            Backend.graph.run(query)
         else:
             return query
 
@@ -173,7 +173,7 @@ class backend:
         """
         queries = []
         for roi in subject.rois:
-            roi_regressor = graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
+            roi_regressor = Backend.graph.run(f"MATCH (n:ROI{{name:'{roi}'}}) RETURN n.roi_regressor").evaluate()
             if roi_regressor is None or roi_regressor == '':
                 roi_regressor = '{}'
             roi_regressor_dict = json.loads(roi_regressor)
@@ -182,7 +182,7 @@ class backend:
             roi_regressor_json = json.dumps(roi_regressor_dict)
             query = f"MATCH (n:ROI{{name:'{roi}'}}) SET n.roi_regressor='{roi_regressor_json}'"
             if run:
-                graph.run(query)
+                Backend.graph.run(query)
             else:
                 queries.append(query)
         if not run:
