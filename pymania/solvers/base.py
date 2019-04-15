@@ -48,7 +48,8 @@ class Solver(ABC):
     def load(self):
         if (len(self.subjects)==0 or len(self.rois)==0):
             raise Exception('Please first add subjects and ROIs')
-        for subject in self.subjects:
+        for co,subject in enumerate(self.subjects):
+            print('loading subject',co,subject)
             data = self.backend.getdata_sts(subject,self.rois)
             self._subjects[subject]._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(data)}
             self._subjects[subject]._data = [ST(subject,*xx.values()) for xx in data]
@@ -113,7 +114,8 @@ class Solver(ABC):
         '''
         Running MANIA on matrix1
         '''
-        for subject in self:
+        for co,subject in enumerate(self):
+            print('MANIA1 on subject',co,subject)
             try:
                 net,den,nar,t = mania_on_mat(subject.matrix1)
             except AttributeError:
@@ -150,9 +152,10 @@ class Solver(ABC):
     @pipeline(-1)
     def run_mania2(self,save=True):
         '''
-        Running MANIA on matrix1
+        Running MANIA on matrix2
         '''
-        for subject in self:
+        for co,subject in enumerate(self):
+            print('MANIA2 on subject',co,subject)
             try:
                 net,den,nar,t = mania_on_mat(subject.matrix2)
             except AttributeError:
@@ -160,8 +163,8 @@ class Solver(ABC):
             ind = np.argmin(nar)
             subject.threshold2 = t[ind]
             subject.mania2_network = net
-            if 'temp' not in self.id:
-                self.save_to_db(subject)
+            # if 'temp' not in self.id:
+            #     self.save_to_db(subject)
 
 
     @is_loaded
