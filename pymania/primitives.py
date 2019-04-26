@@ -217,7 +217,7 @@ class ST:
         connection between them.
         '''
         if not strong:
-            return self.border>0
+            return self.border is not None and self.border>0
         if self.border<1:
             return False
         for i,w in enumerate(self.data):
@@ -396,7 +396,7 @@ class EnsembleST:
     In future, we may extend this class to contain a single ST
     from across a subject cohort.
     '''
-    def __init__(self,arg=None,**kwargs):
+    def __init__(self,arg=None,ih=False,**kwargs):
         try:
             self.subject = kwargs['subject']
             self.mode = 0 # single subject mode
@@ -404,6 +404,7 @@ class EnsembleST:
             self._mode = 1
         if arg:
             self.data = arg
+        self.ih = ih
         self.roi_regressors = None
 
     @property

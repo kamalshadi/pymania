@@ -13,7 +13,7 @@ class RunId(Enum):
 
 
 class Solver(ABC):
-    def __init__(self,name,backend,id,num_steps=5):
+    def __init__(self,name,backend,id,ih,num_steps=5):
         self.name = name
         self._backend = backend
         self.id = id
@@ -22,6 +22,7 @@ class Solver(ABC):
         self._rois = set([])
         self._loaded = False
         self.order = 0
+        self.ih = ih
         if 'vsparse' in id:
             self.run_id = RunId.VerySparse
         elif 'sparse' in id:
@@ -50,14 +51,14 @@ class Solver(ABC):
             raise Exception('Please first add subjects and ROIs')
         for co,subject in enumerate(self.subjects):
             print('loading subject',co,subject)
-            data = self.backend.getdata_sts(subject,self.rois)
+            data = self.backend.getdata_sts(subject,self.rois,self.ih)
             self._subjects[subject]._sts = {(xx['n1'],xx['n2']):i for i,xx in enumerate(data)}
             self._subjects[subject]._data = [ST(subject,*xx.values()) for xx in data]
             self._subjects[subject]._rois = self.rois
         self._loaded = True
 
     def add_subject(self,id):
-        self._subjects[id]=EnsembleST(subject=id)
+        self._subjects[id]=EnsembleST(subject=id,ih=self.ih)
 
     def add_roi(self,id):
         self._rois.add(id)
@@ -104,6 +105,7 @@ class Solver(ABC):
             for i,roi1 in enumerate(rois):
                 for j,roi2 in enumerate(rois):
                     if roi1==roi2:continue
+                    if self.ih and roi1[0]==roi2[0]:continue
                     ind = subject._sts[(roi1,roi2)]
                     conn = subject.data[ind]
                     mat[i,j] = np.exp(conn.weight)*config.NOS
@@ -137,6 +139,7 @@ class Solver(ABC):
             for i,roi1 in enumerate(rois):
                 for j,roi2 in enumerate(rois):
                     if roi1==roi2:continue
+                    if self.ih and roi1[0]==roi2[0]:continue
                     ind = subject._sts[(roi1,roi2)]
                     conn = subject.data[ind]
                     if self.run_id in [RunId.VerySparse] and conn.corrected_weight > 0:
@@ -184,6 +187,7 @@ class Solver(ABC):
         for roi1 in tqdm(rois, desc='ROIs'):
             for roi2 in rois:
                 if roi1 == roi2: continue
+                if self.ih and roi1[0]==roi2[0]:continue
                 ind = subject._sts[(roi1, roi2)]
                 conn = subject.data[ind]
                 attributes = {'SUBJECT':subject.subject,

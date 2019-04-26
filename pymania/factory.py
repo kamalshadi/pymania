@@ -22,8 +22,8 @@ class Factory:
 
 F = Factory()
 
-def create_project(name,id):
+def create_project(name,id,ih=False):
     if name in F.svs.keys():
-        return F.svs[name](F.backend,id)
+        return F.svs[name](F.backend,id,ih)
     else:
         raise Exception('Solver does not exist!')

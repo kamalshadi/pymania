@@ -10,8 +10,8 @@ from .pipeline import *
 
 class Constantine(Solver):
     '''Latest solver based on Constantine's meeting on January 18th'''
-    def __init__(self,backend,id):
-        super().__init__(self.__class__.__name__,backend,id)
+    def __init__(self,backend,id,ih):
+        super().__init__(self.__class__.__name__,backend,id,ih)
 
     @is_loaded
     @pipeline(1)
@@ -29,6 +29,7 @@ class Constantine(Solver):
             for roi1 in self.rois:
                 for roi2 in self.rois:
                     if roi1==roi2:continue
+                    if self.ih and roi1[0]==roi2[0]:continue
                     pair = subject(roi1,roi2,True)
                     find_envelope_points(pair,self.noise_threshold)
                     find_envelope_points(pair.st1,self.noise_threshold)
@@ -56,6 +57,7 @@ class Constantine(Solver):
             for roi1 in self.rois:
                 for roi2 in self.rois:
                     if roi1==roi2:continue
+                    if self.ih and roi1[0]==roi2[0]:continue
                     pair = subject(roi1,roi2,True)
                     find_local_regressor(pair.st1)
                     find_local_regressor(pair.st2)

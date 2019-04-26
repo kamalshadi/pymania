@@ -47,11 +47,25 @@ class Backend:
         return A[0]
 
 
-    def getdata_sts(self,sub,rois):
-        roi_list = "['" + "','".join(rois) + "']"
-        query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
-                    WHERE n.name IN {roi_list} AND m.name IN {roi_list} AND r.SUBJECT={sub}
-                    RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
+    def getdata_sts(self,sub,rois,ih = False):
+        if ih:
+            l = len(rois)//2
+            rois=sorted(list(rois))
+            roi_list1 = "['" + "','".join(rois[0:l]) + "']"
+            roi_list2 = "['" + "','".join(rois[l:]) + "']"
+            query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
+                        WHERE
+                        (
+                        (n.name IN {roi_list1} AND m.name IN {roi_list2}) OR
+                        (n.name IN {roi_list2} AND m.name IN {roi_list1})
+                        ) AND
+                        r.SUBJECT={sub}
+                        RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
+        else:
+            roi_list = "['" + "','".join(rois) + "']"
+            query = f'''MATCH (n:ROI)-[r:NOS]->(m:ROI)
+                        WHERE n.name IN {roi_list} AND m.name IN {roi_list} AND r.SUBJECT={sub}
+                        RETURN n.name as n1, m.name as n2, r._length as _length, r._weight as _weight, r.border as border'''
         out = Backend.graph.run(query).data()
         return out
 
